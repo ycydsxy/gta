@@ -1,0 +1,10 @@
+language: go
+go:
+  - "1.13"
+services:
+  - mysql
+before_install:
+  - mysql -e 'CREATE DATABASE test_db;'
+before_script:
+  - mysql -D test_db < model.sql
+script: go test -v ./...

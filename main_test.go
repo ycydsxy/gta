@@ -54,7 +54,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMainProcess(t *testing.T) {
-	db, err := gorm.Open("mysql", "root:123456@(10.227.16.184:3306)/test_db?charset=utf8&parseTime=True&loc=UTC")
+	db, err := gorm.Open("mysql", "root@(127.0.0.1:3306)/test_db?charset=utf8&parseTime=True&loc=UTC")
 	if err != nil {
 		panic(err)
 	}
