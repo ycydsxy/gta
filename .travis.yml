@@ -7,4 +7,6 @@ before_install:
   - mysql -e 'CREATE DATABASE test_db;'
 before_script:
   - mysql -D test_db < model.sql
-script: go test -v ./...
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+script: go test -v  -coverprofile=coverage.txt -covermode=atomic ./...
