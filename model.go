@@ -22,8 +22,8 @@ type TaskModel struct {
 	ID         uint64
 	TaskKey    TaskKey
 	TaskStatus TaskStatus
-	Context    json.RawMessage
-	Argument   json.RawMessage
+	Context    []byte
+	Argument   []byte
 	Extra      TaskExtra
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
@@ -43,9 +43,12 @@ type TaskExtra struct {
 }
 
 func (s TaskExtra) Value() (driver.Value, error) {
-	return valueJSON(s)
+	return json.Marshal(s)
 }
 
 func (s *TaskExtra) Scan(v interface{}) error {
-	return scanJSON(v, s)
+	if v == nil {
+		return nil
+	}
+	return json.Unmarshal(v.([]byte), s)
 }

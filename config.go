@@ -5,42 +5,20 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/panjf2000/ants/v2"
 )
-
-const (
-	defaultStorageTimeout      = 7 * 24 * time.Hour
-	defaultWaitTimeout         = 0 * time.Second
-	defaultScanInterval        = 5 * time.Second
-	defaultInstantScanInvertal = 100 * time.Millisecond
-	defaultRunningTimeout      = 30 * time.Minute
-	defaultInitializedTimeout  = 5 * time.Minute
-	defaultPoolSize            = ants.DefaultAntsPoolSize
-)
-
-type CtxMarshaler interface {
-	MarshalCtx(ctx context.Context) ([]byte, error)
-	UnmarshalCtx(bytes []byte) (context.Context, error)
-}
-
-type Logger interface {
-	Printf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
-	Warnf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-}
 
 type Config struct {
 	// must provide, async task table name
 	TableName string
 	// must provide, task db factory
 	DBFactory func() *gorm.DB
+
+	// optional, context for the task mansger
+	Context context.Context
 	// optional, task slave db factory
 	SlaveDBFactory func() *gorm.DB
 	// optional, logger factory
 	LoggerFactory func(ctx context.Context) Logger
-	// optional, context for the task mansger
-	Context context.Context
 	// optional, determine when a normal task can be cleaned
 	StorageTimeout time.Duration
 	// optional, determine whether a initialized task is abnormal
@@ -74,14 +52,14 @@ func (s *Config) init() error {
 	}
 
 	// default value for optional config
+	if s.Context == nil {
+		s.Context = defaultContext()
+	}
 	if s.SlaveDBFactory == nil {
 		s.SlaveDBFactory = s.DBFactory
 	}
 	if s.LoggerFactory == nil {
-		s.LoggerFactory = emptyLoggerFactory()
-	}
-	if s.Context == nil {
-		s.Context = emptyContext()
+		s.LoggerFactory = defaultLoggerFactory()
 	}
 
 	if s.StorageTimeout <= 0 {
@@ -104,11 +82,11 @@ func (s *Config) init() error {
 	}
 
 	if s.CtxMarshaler == nil {
-		s.CtxMarshaler = emptyCtxMarshaler{}
+		s.CtxMarshaler = defaultCtxMarshaler{}
 	}
 
 	if s.CheckCallback == nil {
-		s.CheckCallback = emptyCheckCallback(s.logger())
+		s.CheckCallback = defaultCheckCallback(s.logger())
 	}
 
 	if s.PoolSize <= 0 {
@@ -131,6 +109,7 @@ func (s *Config) init() error {
 
 	// generate context with cancel
 	s.Context, s.cancelFunc = context.WithCancel(s.Context)
+
 	return nil
 }
 
@@ -153,10 +132,74 @@ func (s *Config) cancel() {
 	s.cancelFunc()
 }
 
+type Logger interface {
+	Printf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
+type CtxMarshaler interface {
+	MarshalCtx(ctx context.Context) ([]byte, error)
+	UnmarshalCtx(bytes []byte) (context.Context, error)
+}
+
 // Option represents the optional function.
-type Option func(opts *Config)
+type Option func(c *Config)
 
 // WithConfig accepts the whole config.
 func WithConfig(config Config) Option {
-	return func(opts *Config) { *opts = config }
+	return func(c *Config) { *c = config }
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(c *Config) { c.Context = ctx }
+}
+
+func WithSlaveDBFactory(f func() *gorm.DB) Option {
+	return func(c *Config) { c.SlaveDBFactory = f }
+}
+
+func WithLoggerFactory(f func(ctx context.Context) Logger) Option {
+	return func(c *Config) { c.LoggerFactory = f }
+}
+
+func WithStorageTimeout(d time.Duration) Option {
+	return func(c *Config) { c.StorageTimeout = d }
+}
+
+func WithInitializedTimeout(d time.Duration) Option {
+	return func(c *Config) { c.InitializedTimeout = d }
+}
+
+func WithRunningTimeout(d time.Duration) Option {
+	return func(c *Config) { c.RunningTimeout = d }
+}
+
+func WithWaitTimeout(d time.Duration) Option {
+	return func(c *Config) { c.WaitTimeout = d }
+}
+
+func WithScanInterval(d time.Duration) Option {
+	return func(c *Config) { c.ScanInterval = d }
+}
+
+func WithInstantScanInterval(d time.Duration) Option {
+	return func(c *Config) { c.InstantScanInvertal = d }
+}
+
+func WithCtxMarshaler(m CtxMarshaler) Option {
+	return func(c *Config) { c.CtxMarshaler = m }
+}
+
+func WithCheckCallback(f func(abnormalTasks []TaskModel)) Option {
+	return func(c *Config) { c.CheckCallback = f }
+}
+
+func WithDryRun(flag bool) Option {
+	return func(c *Config) { c.DryRun = flag }
+}
+
+func WithPoolSize(size int) Option {
+	return func(c *Config) { c.PoolSize = size }
 }

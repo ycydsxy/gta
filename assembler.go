@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"runtime/debug"
 )
 
 type taskAssembler interface {
@@ -17,14 +16,8 @@ type taskAssemblerImp struct {
 	config *Config
 }
 
-func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition,
-	arg interface{}) (task *TaskModel, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v\n%s", r, string(debug.Stack())) // TODO
-		}
-	}()
-
+func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *TaskModel, err error) {
+	// check if arg is valid
 	if argTExpected := taskDef.ArgType; argTExpected != nil {
 		argVActual := reflect.ValueOf(arg)
 		if argVActual.IsValid() && argVActual.Type() != argTExpected {

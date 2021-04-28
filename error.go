@@ -3,9 +3,9 @@ package gta
 import "errors"
 
 var (
-	ErrNotUpdated   = errors.New("not updated in task/async")
-	ErrUnexpected   = errors.New("unexpected in task/async")
-	ErrTaskNotFound = errors.New("task not found in task/async")
+	ErrNotUpdated   = errors.New("not updated")
+	ErrUnexpected   = errors.New("unexpected")
+	ErrTaskNotFound = errors.New("task not found")
 
 	// config
 	ErrConfigEmptyTable                 = errors.New("config table is empty")

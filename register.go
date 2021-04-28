@@ -25,10 +25,9 @@ func (s *taskRegisterImp) Register(key TaskKey, def TaskDefinition) error {
 		return fmt.Errorf("task_key exceed max length: %v", key)
 	}
 	if err := def.init(key); err != nil {
-		return fmt.Errorf("definition validate error, task_key: %v, caused by: %w", key, err)
+		return fmt.Errorf("definition validate error: %w, task_key: %v", err, key)
 	}
-	_, loaded := s.defMap.LoadOrStore(def.key, &def)
-	if loaded {
+	if _, loaded := s.defMap.LoadOrStore(def.key, &def); loaded {
 		return fmt.Errorf("definition already registered, task_key: %v", def.key)
 	}
 	return nil
@@ -37,7 +36,7 @@ func (s *taskRegisterImp) Register(key TaskKey, def TaskDefinition) error {
 func (s *taskRegisterImp) GetDefinition(key TaskKey) (*TaskDefinition, error) {
 	value, ok := s.defMap.Load(key)
 	if !ok {
-		return nil, fmt.Errorf("definition not found, task_key: %v", key) // TODO
+		return nil, fmt.Errorf("definition not found, task_key: %v", key)
 	}
 	return value.(*TaskDefinition), nil
 }

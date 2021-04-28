@@ -17,20 +17,18 @@ func NewTaskManager(dbFactory func() *gorm.DB, tableName string, options ...Opti
 	if err := tc.load(options...).init(); err != nil {
 		panic(err)
 	}
-	tm := new(TaskManager)
-	tm.tc = tc
-	tm.tr = &taskRegisterImp{}
-	tm.tdal = &taskDALImp{config: tc}
-	tm.tass = &taskAssemblerImp{config: tc}
+
+	tr := &taskRegisterImp{}
+	tdal := &taskDALImp{config: tc}
+	tass := &taskAssemblerImp{config: tc}
 	pool, err := ants.NewPool(tc.PoolSize, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
 	if err != nil {
 		panic(err)
 	}
-	tm.tsch = &taskSchedulerImp{config: tc, register: tm.tr, dal: tm.tdal, assembler: tm.tass, pool: pool}
-	tm.tmon = &taskMonitorImp{config: tc, register: tm.tr, dal: tm.tdal, assembler: tm.tass}
-	tm.tscn = &taskScannerImp{config: tc, register: tm.tr, dal: tm.tdal, scheduler: tm.tsch}
-
-	return tm
+	tsch := &taskSchedulerImp{config: tc, register: tr, dal: tdal, assembler: tass, pool: pool}
+	tmon := &taskMonitorImp{config: tc, register: tr, dal: tdal, assembler: tass}
+	tscn := &taskScannerImp{config: tc, register: tr, dal: tdal, scheduler: tsch}
+	return &TaskManager{tc: tc, tr: tr, tass: tass, tsch: tsch, tdal: tdal, tmon: tmon, tscn: tscn}
 }
 
 type TaskManager struct {
@@ -160,7 +158,7 @@ func (s *TaskManager) ForceRerunTask(taskID uint64, status TaskStatus) error {
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return s.tdal.ForceUpdateTaskStatusByIDs(s.tc.DBFactory(), taskIDs, status, taskStatusInitialized)
+	return s.tdal.UpdateStatusByIDs(s.tc.DBFactory(), taskIDs, status, taskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.

@@ -1,10 +1,7 @@
 package gta
 
 import (
-	"sync/atomic"
 	"time"
-
-	"github.com/jinzhu/gorm"
 )
 
 type taskScanner interface {
@@ -12,17 +9,17 @@ type taskScanner interface {
 }
 
 type taskScannerImp struct {
-	config    *Config
-	register  taskRegister
-	dal       taskDAL
-	scheduler taskScheduler
-
-	instantScan atomic.Value
+	config      *Config
+	register    taskRegister
+	dal         taskDAL
+	scheduler   taskScheduler
+	instantScan bool
 }
 
 func (s *taskScannerImp) GoScanAndSchedule() {
 	logger := s.config.logger()
-	logger.Infof("scan and run start, scan interval[%v]", s.config.ScanInterval)
+	logger.Infof("[GoScanAndSchedule] scan and run start, scan interval[%v], instant scan interval[%v]",
+		s.config.ScanInterval, s.config.InstantScanInvertal)
 	go func() {
 		defer panicHandler()
 		for {
@@ -31,7 +28,7 @@ func (s *taskScannerImp) GoScanAndSchedule() {
 				return
 			default:
 				s.scanAndSchedule()
-				time.Sleep(s.getScanInterval())
+				time.Sleep(s.scanInterval())
 			}
 		}
 	}()
@@ -41,71 +38,64 @@ func (s *taskScannerImp) scanAndSchedule() {
 	logger := s.config.logger()
 
 	if !s.scheduler.CanSchedule() {
+		// the schedule has reached its capacity limit
 		s.switchOffInstantScan()
 		return
 	}
 
 	task, err := s.claimInitializedTask()
-	if err == ErrTaskNotFound {
-		// no task remained
+	if err != nil {
+		// no task remained or other error occured, i.e. the db has gone
+		if err != ErrTaskNotFound {
+			logger.Errorf("[scanAndSchedule] claim task err, err[%v]", err)
+		}
 		s.switchOffInstantScan()
 		return
-	} else if err != nil {
-		logger.Errorf("[scanAndSchedule] claim task err, err[%v]", err)
-		// maybe the db has gone, it's better to switch off instant scan
-		s.switchOffInstantScan()
-		return
+	} else if task != nil {
+		s.scheduler.GoScheduleTask(task)
 	}
 
 	s.switchOnInstantScan()
-	if task != nil {
-		s.scheduler.GoScheduleTask(task)
-	}
 }
 
-func (s *taskScannerImp) getScanInterval() time.Duration {
-	if s.needInstantScan() {
+func (s *taskScannerImp) scanInterval() time.Duration {
+	if s.instantScan {
 		return randomInterval(s.config.InstantScanInvertal)
 	}
 	return randomInterval(s.config.ScanInterval)
 }
 
-func (s *taskScannerImp) needInstantScan() bool {
-	iv := s.instantScan.Load()
-	if iv == nil {
-		return false
-	}
-	return iv.(bool)
-}
-
 func (s *taskScannerImp) switchOffInstantScan() {
-	s.instantScan.Store(false)
+	s.instantScan = false
 }
 
 func (s *taskScannerImp) switchOnInstantScan() {
-	s.instantScan.Store(true)
+	s.instantScan = true
 }
 
 func (s *taskScannerImp) claimInitializedTask() (*TaskModel, error) {
+	c := s.config
+
 	sensitiveKeys, insensitiveKeys := s.register.GroupKeysByInitTimeoutSensitivity()
-	task, err := s.dal.GetInitializedTask(s.config.SlaveDBFactory(), sensitiveKeys, s.config.InitializedTimeout,
-		insensitiveKeys)
-	if err == gorm.ErrRecordNotFound { // no initialized tasks remained
-		return nil, ErrTaskNotFound
-	} else if err != nil {
+	task, err := s.dal.GetInitialized(c.SlaveDBFactory(), sensitiveKeys, c.InitializedTimeout, insensitiveKeys)
+	if err != nil {
 		return nil, err
+	} else if task == nil {
+		// no initialized tasks remained
+		return nil, ErrTaskNotFound
 	}
 
 	select {
-	case <-s.config.done(): // abort claim in stop process
+	case <-c.done():
+		// abort claim when cancel signal received
 		return nil, nil
 	default:
-		if err := s.scheduler.StartRunning(&task); err == ErrNotUpdated {
-			// task is claimed by other pod, ignore error
+		if err := s.scheduler.StartRunning(task); err == ErrNotUpdated {
+			// task is claimed by others, ignore error
 			return nil, nil
 		} else if err != nil {
 			return nil, err
 		}
-		return &task, nil
+		return task, nil
 	}
 }

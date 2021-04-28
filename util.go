@@ -1,8 +1,6 @@
 package gta
 
 import (
-	"encoding/json"
-	"fmt"
 	"math"
 	"math/rand"
 	"runtime/debug"
@@ -15,34 +13,9 @@ const (
 	randomIntervalFactor = 0.2
 )
 
-// randomInterval for [interval,randomIntervalFactor*interval)
+// randomInterval generates random interval in [interval,randomIntervalFactor*interval)
 func randomInterval(interval time.Duration) time.Duration {
 	return interval + time.Duration(randomIntervalFactor*rand.Float64()*float64(interval))
-}
-
-func valueJSON(value interface{}) (string, error) {
-	jsonString, err := json.Marshal(value)
-	if err != nil {
-		return "", err
-	}
-	return string(jsonString), nil
-}
-
-func scanJSON(v interface{}, value interface{}) error {
-	sVal := ""
-	switch tv := v.(type) {
-	case []byte:
-		sVal = string(tv)
-	case string:
-		sVal = tv
-	default:
-		return fmt.Errorf("scanJSON: converting type %T to string", v)
-	}
-
-	if err := json.Unmarshal([]byte(sVal), value); err != nil {
-		return err
-	}
-	return nil
 }
 
 func panicHandler() {

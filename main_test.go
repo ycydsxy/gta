@@ -70,7 +70,7 @@ func TestMainProcess(t *testing.T) {
 		},
 		LoggerFactory:      loggerFactory,
 		Context:            rootContext(),
-		CtxMarshaler:       defaultCtxMarshaler{},
+		CtxMarshaler:       testCtxMarshaler{},
 		ScanInterval:       time.Second,
 		InitializedTimeout: time.Second * 5,
 		RunningTimeout:     time.Second * 8,
@@ -251,7 +251,7 @@ func TestMainProcess(t *testing.T) {
 
 		convey.Convey("TestForceRerunTask", func() {
 			convey.Convey("normal", func() {
-				err := ForceRerunTask(3, taskStatusFailed)
+				err := ForceRerunTask(10003, taskStatusFailed)
 				convey.So(err, convey.ShouldBeNil)
 			})
 
@@ -315,9 +315,9 @@ func rootContext() context.Context {
 	return context.WithValue(ctx, testCtxRequestIDKey, "root_request_id")
 }
 
-type defaultCtxMarshaler struct{}
+type testCtxMarshaler struct{}
 
-func (t defaultCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
+func (t testCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
 	requestID := ctx.Value(testCtxRequestIDKey)
 	if requestID != nil {
 		requestID = "null_requestID"
@@ -325,7 +325,7 @@ func (t defaultCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
 	return []byte(requestID.(string)), nil
 }
 
-func (t defaultCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
+func (t testCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
 	requestID := string(bytes)
 	return context.WithValue(context.Background(), testCtxRequestIDKey, requestID), nil
 }
