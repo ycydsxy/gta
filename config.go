@@ -11,7 +11,7 @@ type Config struct {
 	// must provide, db for async task table
 	DB *gorm.DB
 	// must provide, async task table name
-	TableName string // FIXME
+	TableName string
 
 	// optional, context for the task mansger
 	Context context.Context
