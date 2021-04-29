@@ -2,6 +2,7 @@
 
 A lightweight reliable asynchronous task library for Golang.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/ycydsxy/gta)](https://goreportcard.com/report/github.com/ycydsxy/gta)
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ycydsxy/gta/Go?logo=github)](https://github.com/ycydsxy/gta/actions/workflows/go.yml)
 ![Travis (.com)](https://img.shields.io/travis/com/ycydsxy/gta?label=test&logo=travis)
 [![Coverage](https://img.shields.io/codecov/c/github/ycydsxy/gta?logo=codecov)](https://codecov.io/gh/ycydsxy/gta)
