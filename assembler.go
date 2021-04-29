@@ -8,15 +8,15 @@ import (
 )
 
 type taskAssembler interface {
-	AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *TaskModel, err error)
-	DisassembleTask(taskDef *TaskDefinition, task *TaskModel) (context.Context, interface{}, error)
+	AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *Task, err error)
+	DisassembleTask(taskDef *TaskDefinition, task *Task) (context.Context, interface{}, error)
 }
 
 type taskAssemblerImp struct {
 	config *Config
 }
 
-func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *TaskModel, err error) {
+func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *Task, err error) {
 	// check if arg is valid
 	if argTExpected := taskDef.ArgType; argTExpected != nil {
 		argVActual := reflect.ValueOf(arg)
@@ -34,7 +34,7 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 	if err != nil {
 		return nil, fmt.Errorf("get ctxBytes failed, err: %w", err)
 	}
-	task = &TaskModel{
+	task = &Task{
 		ID:         taskDef.taskID,
 		TaskKey:    taskDef.key,
 		TaskStatus: taskStatusUnKnown,
@@ -44,7 +44,7 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 	return task, nil
 }
 
-func (s *taskAssemblerImp) DisassembleTask(taskDef *TaskDefinition, task *TaskModel) (context.Context, interface{}, error) {
+func (s *taskAssemblerImp) DisassembleTask(taskDef *TaskDefinition, task *Task) (context.Context, interface{}, error) {
 	ctxIn, err := taskDef.GetCtxMarshaler(s.config).UnmarshalCtx(task.Context)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unmarshal task context error: %w", err)

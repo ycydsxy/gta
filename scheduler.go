@@ -7,21 +7,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/panjf2000/ants/v2"
+	"gorm.io/gorm"
 )
 
 const (
-	transactionKey = "task/async:transaction"
+	transactionKey = "gta:transaction"
 )
 
 type taskScheduler interface {
 	Transaction(fc func(tx *gorm.DB) error) error
 	CreateTask(tx *gorm.DB, ctxIn context.Context, key TaskKey, arg interface{}) error
 	Stop(wait bool)
-	GoScheduleTask(task *TaskModel)
+	GoScheduleTask(task *Task)
 	CanSchedule() bool
-	StartRunning(task *TaskModel) error
+	StartRunning(task *Task) error
 }
 
 type taskSchedulerImp struct {
@@ -34,7 +34,7 @@ type taskSchedulerImp struct {
 }
 
 func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
-	db := s.config.DBFactory().InstantSet(transactionKey, &sync.Map{})
+	db := s.config.DB.Set(transactionKey, &sync.Map{})
 
 	if err := db.Transaction(fc); err != nil {
 		return err
@@ -44,9 +44,8 @@ func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
 	if !ok {
 		return ErrUnexpected
 	}
-
 	toScheduleTasks.(*sync.Map).Range(func(key, value interface{}) bool {
-		s.GoScheduleTask(value.(*TaskModel))
+		s.GoScheduleTask(value.(*Task))
 		return true
 	})
 
@@ -136,7 +135,7 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 			return
 		} else if !wait || (s.config.WaitTimeout > 0 && time.Since(waitStart) > s.config.WaitTimeout) {
 			// change remaining tasks status to initialized
-			rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DBFactory(), taskIDs, taskStatusRunning, taskStatusInitialized)
+			rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, taskIDs, taskStatusRunning, taskStatusInitialized)
 			if err != nil {
 				logger.Errorf("[Stop] update task status from running to initialized failed, err[%v]", err)
 				return
@@ -147,7 +146,7 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 	}
 }
 
-func (s *taskSchedulerImp) GoScheduleTask(task *TaskModel) {
+func (s *taskSchedulerImp) GoScheduleTask(task *Task) {
 	logger := s.config.logger()
 
 	f := func() {
@@ -170,7 +169,7 @@ func (s *taskSchedulerImp) CanSchedule() bool {
 	return s.pool.Free() > 0
 }
 
-func (s *taskSchedulerImp) scheduleTask(task *TaskModel) {
+func (s *taskSchedulerImp) scheduleTask(task *Task) {
 	logger := s.config.logger()
 
 	taskDef, err := s.register.GetDefinition(task.TaskKey)
@@ -212,7 +211,7 @@ func (s *taskSchedulerImp) scheduleTask(task *TaskModel) {
 	}
 }
 
-func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *TaskModel) (err error) {
+func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *Task) (err error) {
 	logger := s.config.logger()
 
 	startTime := time.Now()
@@ -242,18 +241,18 @@ func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *TaskModel)
 	return nil
 }
 
-func (s *taskSchedulerImp) stopRunning(task *TaskModel, taskDef *TaskDefinition, toStatus TaskStatus) error {
+func (s *taskSchedulerImp) stopRunning(task *Task, taskDef *TaskDefinition, toStatus TaskStatus) error {
 	if task.TaskStatus != taskStatusRunning {
 		return fmt.Errorf("task status[%v] is not running", task.TaskStatus)
 	}
 	if taskDef.CleanSucceeded && toStatus == taskStatusSucceeded {
-		if rowsAffected, err := s.dal.HardDeleteByIDAndStatus(s.config.DBFactory(), task.ID, task.TaskStatus); err != nil {
+		if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.DB, task.ID, task.TaskStatus); err != nil {
 			return fmt.Errorf("clean task error: %w", err)
 		} else if rowsAffected == 0 {
 			return ErrNotUpdated
 		}
 	} else {
-		if rowsAffected, err := s.dal.UpdateStatus(s.config.DBFactory(), *task, toStatus); err != nil {
+		if rowsAffected, err := s.dal.UpdateStatus(s.config.DB, *task, toStatus); err != nil {
 			return fmt.Errorf("update task status from %v to %v error: %w", task.TaskStatus, toStatus, err)
 		} else if rowsAffected == 0 {
 			return ErrNotUpdated
@@ -264,11 +263,11 @@ func (s *taskSchedulerImp) stopRunning(task *TaskModel, taskDef *TaskDefinition,
 	return nil
 }
 
-func (s *taskSchedulerImp) StartRunning(task *TaskModel) error {
+func (s *taskSchedulerImp) StartRunning(task *Task) error {
 	if task.TaskStatus == taskStatusRunning {
 		return ErrUnexpected
 	}
-	if rowsAffected, err := s.dal.UpdateStatus(s.config.DBFactory(), *task, taskStatusRunning); err != nil {
+	if rowsAffected, err := s.dal.UpdateStatus(s.config.DB, *task, taskStatusRunning); err != nil {
 		return fmt.Errorf("update task status from %v to %v error: %w", task.TaskStatus, taskStatusRunning, err)
 	} else if rowsAffected == 0 {
 		return ErrNotUpdated
@@ -278,12 +277,12 @@ func (s *taskSchedulerImp) StartRunning(task *TaskModel) error {
 	return nil
 }
 
-func (s *taskSchedulerImp) createInitializedTask(tx *gorm.DB, task *TaskModel) error {
+func (s *taskSchedulerImp) createInitializedTask(tx *gorm.DB, task *Task) error {
 	task.TaskStatus = taskStatusInitialized
 	return s.dal.Create(tx, task)
 }
 
-func (s *taskSchedulerImp) createRunningTask(tx *gorm.DB, task *TaskModel) error {
+func (s *taskSchedulerImp) createRunningTask(tx *gorm.DB, task *Task) error {
 	task.TaskStatus = taskStatusRunning
 	if err := s.dal.Create(tx, task); err != nil {
 		return err
@@ -292,11 +291,11 @@ func (s *taskSchedulerImp) createRunningTask(tx *gorm.DB, task *TaskModel) error
 	return nil
 }
 
-func (s *taskSchedulerImp) markRunning(task *TaskModel) {
+func (s *taskSchedulerImp) markRunning(task *Task) {
 	s.runningMap.Store(task.ID, nil)
 }
 
-func (s *taskSchedulerImp) unmarkRunning(task *TaskModel) {
+func (s *taskSchedulerImp) unmarkRunning(task *Task) {
 	s.runningMap.Delete(task.ID)
 }
 

@@ -3,7 +3,7 @@ package gta
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 type taskMonitor interface {
@@ -54,7 +54,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 	}
 	newTask.TaskStatus = taskStatusInitialized
 
-	if err := s.config.DBFactory().Transaction(func(tx *gorm.DB) error {
+	if err := s.config.DB.Transaction(func(tx *gorm.DB) error {
 		if task, err := s.dal.GetForUpdate(tx, taskDef.taskID); err != nil {
 			return err
 		} else if task == nil {
@@ -64,7 +64,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 		}
 
 		// need loop
-		if rows, err := s.dal.UpdateByIDAndKey(tx, newTask.ID, newTask.TaskKey, newTask.updateMap()); err != nil {
+		if rows, err := s.dal.Update(tx, newTask); err != nil {
 			return err
 		} else if rows <= 0 {
 			return ErrNotUpdated
@@ -73,7 +73,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 	}); err == ErrTaskNotFound {
 		// need create, ignore primary key conflict
 		// TODO: distinguish primary key conflict error
-		_ = s.dal.Create(s.config.DBFactory(), newTask)
+		_ = s.dal.Create(s.config.DB, newTask)
 		return
 	} else if err != nil {
 		logger.Errorf("[monitorBuiltinTask] update transaction failed, err[%v], task_key[%v]", err, taskDef.key)
@@ -81,7 +81,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 	}
 }
 
-func (s *taskMonitorImp) needLoopBuiltinTask(task *TaskModel, taskDef *TaskDefinition) bool {
+func (s *taskMonitorImp) needLoopBuiltinTask(task *Task, taskDef *TaskDefinition) bool {
 	// normal loop if task_status is succeeded or failed
 	needNormalLoop := time.Since(task.UpdatedAt) >= taskDef.loopInterval && (
 		task.TaskStatus == taskStatusSucceeded || task.TaskStatus == taskStatusFailed)

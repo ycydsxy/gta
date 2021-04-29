@@ -73,11 +73,11 @@ func (s *taskScannerImp) switchOnInstantScan() {
 	s.instantScan = true
 }
 
-func (s *taskScannerImp) claimInitializedTask() (*TaskModel, error) {
+func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
 	c := s.config
 
 	sensitiveKeys, insensitiveKeys := s.register.GroupKeysByInitTimeoutSensitivity()
-	task, err := s.dal.GetInitialized(c.SlaveDBFactory(), sensitiveKeys, c.InitializedTimeout, insensitiveKeys)
+	task, err := s.dal.GetInitialized(c.DB, sensitiveKeys, c.InitializedTimeout, insensitiveKeys)
 	if err != nil {
 		return nil, err
 	} else if task == nil {

@@ -3,19 +3,19 @@ package gta
 import (
 	"context"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 var (
-	defaultManager = NewTaskManager(defaultDBFactory, defaultTableName)
+	defaultManager = NewTaskManager(defaultDB, defaultTableName)
 )
 
 // Start initializes the overall configuration. It starts a scan process asynchronously after everything is ready.
 //
 // The task table name and database factory method must be provided in the initialize process because this tool relies
 // heavily on the database. For more information about the table schema, please refer to 'model.go'.
-func Start(dbFactory func() *gorm.DB, tableName string, options ...Option) {
-	c := Config{DBFactory: dbFactory, TableName: tableName}
+func Start(db *gorm.DB, tableName string, options ...Option) {
+	c := Config{DB: db, TableName: tableName}
 	if err := defaultManager.tc.load(WithConfig(c)).load(options...).init(); err != nil {
 		panic(err)
 	}
@@ -53,8 +53,6 @@ func Wait() {
 	defaultManager.Wait()
 }
 
-/* Following are DevOps APIs */
-
 // ForceRerunTask changes the specific task to 'initialized'.
 func ForceRerunTask(taskID uint64, status TaskStatus) error {
 	return defaultManager.ForceRerunTask(taskID, status)
@@ -66,6 +64,6 @@ func ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
-func QueryUnsuccessfulTasks() ([]TaskModel, error) {
+func QueryUnsuccessfulTasks() ([]Task, error) {
 	return defaultManager.QueryUnsuccessfulTasks()
 }

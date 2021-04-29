@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/panjf2000/ants/v2"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 var (
 	defaultTableName           = "default_table_name"
-	defaultDBFactory           = func() *gorm.DB { return nil }
+	defaultDB                  = &gorm.DB{}
 	defaultStorageTimeout      = 7 * 24 * time.Hour
 	defaultWaitTimeout         = 0 * time.Second
 	defaultScanInterval        = 5 * time.Second
@@ -40,8 +40,8 @@ func defaultLoggerFactory() func(ctx context.Context) Logger {
 	return func(ctx context.Context) Logger { return logrus.NewEntry(logrus.New()) }
 }
 
-func defaultCheckCallback(logger Logger) func(abnormalTasks []TaskModel) {
-	return func(abnormalTasks []TaskModel) {
+func defaultCheckCallback(logger Logger) func(abnormalTasks []Task) {
+	return func(abnormalTasks []Task) {
 		if len(abnormalTasks) == 0 {
 			return
 		}

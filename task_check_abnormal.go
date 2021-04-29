@@ -40,12 +40,12 @@ func checkAbnormalHandler(tm *TaskManager) TaskHandler {
 	tc := tm.tc
 	return func(ctx context.Context, arg interface{}) (err error) {
 		req := arg.(checkAbnormalTaskReq)
-		abnormalRunning, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.SlaveDBFactory(), req.StorageTimeout,
+		abnormalRunning, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.DB, req.StorageTimeout,
 			req.RunningTimeout, taskStatusRunning)
 		if err != nil {
 			return fmt.Errorf("check abnormal running failed")
 		}
-		abnormalInitilized, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.SlaveDBFactory(), req.StorageTimeout,
+		abnormalInitilized, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.DB, req.StorageTimeout,
 			req.InitializedTimeout, taskStatusInitialized)
 		if err != nil {
 			return fmt.Errorf("check abnormal running failed")
@@ -57,7 +57,7 @@ func checkAbnormalHandler(tm *TaskManager) TaskHandler {
 			builtinSet[bk] = struct{}{}
 		}
 
-		abnormalTasks := make([]TaskModel, 0, len(abnormalRunning)+len(abnormalInitilized))
+		abnormalTasks := make([]Task, 0, len(abnormalRunning)+len(abnormalInitilized))
 		for _, t := range abnormalRunning {
 			if _, ok := builtinSet[t.TaskKey]; ok {
 				continue

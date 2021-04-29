@@ -18,7 +18,7 @@ type TaskKey string
 
 type TaskStatus string
 
-type TaskModel struct {
+type Task struct {
 	ID         uint64
 	TaskKey    TaskKey
 	TaskStatus TaskStatus
@@ -27,15 +27,6 @@ type TaskModel struct {
 	Extra      TaskExtra
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
-}
-
-func (s TaskModel) updateMap() map[string]interface{} { // TODO
-	return map[string]interface{}{
-		"task_status": s.TaskStatus,
-		"context":     s.Context,
-		"argument":    s.Argument,
-		"extra":       s.Extra,
-	}
 }
 
 type TaskExtra struct {

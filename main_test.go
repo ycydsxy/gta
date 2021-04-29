@@ -13,10 +13,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	"github.com/smartystreets/goconvey/convey"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -54,20 +55,15 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMainProcess(t *testing.T) {
-	db, err := gorm.Open("mysql", "root@(127.0.0.1:3306)/test_db?charset=utf8&parseTime=True&loc=UTC")
+	db, err := gorm.Open(mysql.Open("root:123456@(10.227.16.184:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		panic(err)
 	}
 
 	// normal init
 	StartWithConfig(Config{
-		TableName: "async_task_test",
-		DBFactory: func() *gorm.DB {
-			return db.New()
-		},
-		SlaveDBFactory: func() *gorm.DB {
-			return db.New()
-		},
+		TableName:          "async_task_test",
+		DB:                 db.Debug(),
 		LoggerFactory:      loggerFactory,
 		Context:            rootContext(),
 		CtxMarshaler:       testCtxMarshaler{},
@@ -130,7 +126,7 @@ func TestMainProcess(t *testing.T) {
 
 				// single no-builtin transaction, tf succeeded, hander successded
 				taskCtx := mockTaskContext("req_1000000fa_t", "fa_t", "fa_u", "fa_c")
-				err = db.New().Transaction(func(tx *gorm.DB) error {
+				err = db.Transaction(func(tx *gorm.DB) error {
 					if err := fa(tx); err != nil {
 						return err
 					}

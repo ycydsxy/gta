@@ -8,12 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/panjf2000/ants/v2"
+	"gorm.io/gorm"
 )
 
-func NewTaskManager(dbFactory func() *gorm.DB, tableName string, options ...Option) *TaskManager {
-	tc := &Config{TableName: tableName, DBFactory: dbFactory}
+func NewTaskManager(db *gorm.DB, tableName string, options ...Option) *TaskManager {
+	tc := &Config{DB: db, TableName: tableName}
 	if err := tc.load(options...).init(); err != nil {
 		panic(err)
 	}
@@ -158,12 +158,12 @@ func (s *TaskManager) ForceRerunTask(taskID uint64, status TaskStatus) error {
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return s.tdal.UpdateStatusByIDs(s.tc.DBFactory(), taskIDs, status, taskStatusInitialized)
+	return s.tdal.UpdateStatusByIDs(s.tc.DB, taskIDs, status, taskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
-func (s *TaskManager) QueryUnsuccessfulTasks() ([]TaskModel, error) {
-	return s.tdal.GetSliceExcludeSucceeded(s.tc.DBFactory(), s.tr.GetBuiltInKeys())
+func (s *TaskManager) QueryUnsuccessfulTasks() ([]Task, error) {
+	return s.tdal.GetSliceExcludeSucceeded(s.tc.DB, s.tr.GetBuiltInKeys())
 }
 
 func (s *TaskManager) registerBuiltinTasks() {

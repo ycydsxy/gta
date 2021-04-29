@@ -4,19 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 type Config struct {
+	// must provide, db for async task table
+	DB *gorm.DB
 	// must provide, async task table name
-	TableName string
-	// must provide, task db factory
-	DBFactory func() *gorm.DB
+	TableName string // FIXME
 
 	// optional, context for the task mansger
 	Context context.Context
-	// optional, task slave db factory
-	SlaveDBFactory func() *gorm.DB
 	// optional, logger factory
 	LoggerFactory func(ctx context.Context) Logger
 	// optional, determine when a normal task can be cleaned
@@ -34,34 +32,32 @@ type Config struct {
 	// optional, context marshaler to store or recover a context
 	CtxMarshaler CtxMarshaler
 	// optional, callback function for abnormal tasks
-	CheckCallback func(abnormalTasks []TaskModel)
+	CheckCallback func(abnormalTasks []Task)
 	// optional, flag for dry run mode
 	DryRun bool
 	// optional, goroutine pool size for scheduling tasks
 	PoolSize int
 
+	// TODO: log level
+
 	cancelFunc context.CancelFunc
 }
 
 func (s *Config) init() error {
+	if s.DB == nil {
+		return ErrConfigNilDBFactory
+	}
 	if s.TableName == "" {
 		return ErrConfigEmptyTable
-	}
-	if s.DBFactory == nil {
-		return ErrConfigNilDBFactory
 	}
 
 	// default value for optional config
 	if s.Context == nil {
 		s.Context = defaultContext()
 	}
-	if s.SlaveDBFactory == nil {
-		s.SlaveDBFactory = s.DBFactory
-	}
 	if s.LoggerFactory == nil {
 		s.LoggerFactory = defaultLoggerFactory()
 	}
-
 	if s.StorageTimeout <= 0 {
 		s.StorageTimeout = defaultStorageTimeout
 	}
@@ -80,15 +76,12 @@ func (s *Config) init() error {
 	if s.InitializedTimeout <= 0 {
 		s.InitializedTimeout = defaultInitializedTimeout
 	}
-
 	if s.CtxMarshaler == nil {
 		s.CtxMarshaler = defaultCtxMarshaler{}
 	}
-
 	if s.CheckCallback == nil {
 		s.CheckCallback = defaultCheckCallback(s.logger())
 	}
-
 	if s.PoolSize <= 0 {
 		s.PoolSize = defaultPoolSize
 	}
@@ -147,17 +140,13 @@ type CtxMarshaler interface {
 // Option represents the optional function.
 type Option func(c *Config)
 
-// WithConfig accepts the whole config.
+// WithConfig set the whole config.
 func WithConfig(config Config) Option {
 	return func(c *Config) { *c = config }
 }
 
 func WithContext(ctx context.Context) Option {
 	return func(c *Config) { c.Context = ctx }
-}
-
-func WithSlaveDBFactory(f func() *gorm.DB) Option {
-	return func(c *Config) { c.SlaveDBFactory = f }
 }
 
 func WithLoggerFactory(f func(ctx context.Context) Logger) Option {
@@ -192,7 +181,7 @@ func WithCtxMarshaler(m CtxMarshaler) Option {
 	return func(c *Config) { c.CtxMarshaler = m }
 }
 
-func WithCheckCallback(f func(abnormalTasks []TaskModel)) Option {
+func WithCheckCallback(f func(abnormalTasks []Task)) Option {
 	return func(c *Config) { c.CheckCallback = f }
 }
 

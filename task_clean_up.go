@@ -32,7 +32,7 @@ func cleanUpHandler(tm *TaskManager) TaskHandler {
 	return func(ctx context.Context, arg interface{}) (err error) {
 		logger := tc.logger()
 		storageTimeout := arg.(cleanUpReq).StorageTimeout
-		rowsAffected, err := tm.tdal.HardDeleteSucceededByOffset(tc.DBFactory(), storageTimeout, tm.tr.GetBuiltInKeys())
+		rowsAffected, err := tm.tdal.DeleteSucceededByOffset(tc.DB, storageTimeout, tm.tr.GetBuiltInKeys())
 		if err != nil {
 			return err
 		} else if rowsAffected > 0 {
