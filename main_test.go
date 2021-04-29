@@ -17,7 +17,6 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 const (
@@ -55,8 +54,7 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMainProcess(t *testing.T) {
-	db, err := gorm.Open(mysql.Open("root@(127.0.0.1:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"),
-		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	db, err := gorm.Open(mysql.Open("root@(127.0.0.1:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"))
 	if err != nil {
 		panic(err)
 	}
