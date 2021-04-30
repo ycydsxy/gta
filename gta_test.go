@@ -85,7 +85,7 @@ func TestMainProcess(t *testing.T) {
 
 			convey.Convey("handler panic", func() {
 				taskCtx := mockTaskContext("", "", "", "")
-				err := Run(taskCtx, testPanicTask, testTaskArg{A: 10000, B: 10000,})
+				err := Run(taskCtx, testPanicTask, testTaskArg{A: 10000, B: 10000})
 				convey.So(err, convey.ShouldBeNil)
 			})
 		})

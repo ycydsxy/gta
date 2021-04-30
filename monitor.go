@@ -83,8 +83,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 
 func (s *taskMonitorImp) needLoopBuiltinTask(task *Task, taskDef *TaskDefinition) bool {
 	// normal loop if task_status is succeeded or failed
-	needNormalLoop := time.Since(task.UpdatedAt) >= taskDef.loopInterval && (
-		task.TaskStatus == TaskStatusSucceeded || task.TaskStatus == TaskStatusFailed)
+	needNormalLoop := time.Since(task.UpdatedAt) >= taskDef.loopInterval && (task.TaskStatus == TaskStatusSucceeded || task.TaskStatus == TaskStatusFailed)
 	// force loop if abnormal running found
 	needForceLoop := time.Since(task.UpdatedAt) >= s.config.RunningTimeout && task.TaskStatus == TaskStatusRunning
 

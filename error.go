@@ -10,7 +10,6 @@ var (
 	// ErrTaskNotFound represents certain task not found.
 	ErrTaskNotFound = errors.New("task not found")
 
-	// config
 	// ErrConfigEmptyTable represents TableName in the config is empty.
 	ErrConfigEmptyTable = errors.New("config table is empty")
 	// ErrConfigNilDB represents DB in the config is nil.
@@ -24,7 +23,6 @@ var (
 	// ErrConfigInvalidInstantScanInterval represents InstantScanInterval in the config is invalid.
 	ErrConfigInvalidInstantScanInterval = errors.New("config instant scan interval is invalid")
 
-	// definition
 	// ErrDefNilHandler represents Handler in the task definition is nil.
 	ErrDefNilHandler = errors.New("definition handler is nil")
 	// ErrDefEmptyPrimaryKey represents primaryKey in the task definition is empty.

@@ -137,7 +137,7 @@ func newConfig(db *gorm.DB, table string, options ...Option) (*TaskConfig, error
 	return c, nil
 }
 
-// logger is a logging interface for logging necessary messages.
+// Logger is a logging interface for logging necessary messages.
 type Logger interface {
 	Printf(format string, args ...interface{})
 	Infof(format string, args ...interface{})

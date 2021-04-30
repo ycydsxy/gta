@@ -55,7 +55,7 @@ func (s *TaskManager) Register(key TaskKey, definition TaskDefinition) {
 
 // Run provides the ability to asynchronously run a registered task reliably. It's an alternative to using 'go func(
 // ){}' when you need to care about the ultimate success of a task.
-
+//
 // An error is returned when the task creating process failed, otherwise, the task will be scheduled asynchronously
 // later. If error or panic occurs in the running process, it will be rescheduled according to the 'RetryTimes' value.
 // If the retry times exceeds the maximum config value, the task is marked 'failed' in the database with error logs

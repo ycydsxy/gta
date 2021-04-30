@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// here are constants for task status
 const (
 	TaskStatusUnKnown     TaskStatus = ""
 	TaskStatusInitialized TaskStatus = "initialized"
@@ -14,7 +15,7 @@ const (
 	TaskStatusFailed      TaskStatus = "failed"
 )
 
-// Taskkey is a unique ID for a set of tasks with same definition.
+// TaskKey is a unique ID for a set of tasks with same definition.
 type TaskKey string
 
 // TaskStatus represents the status of a task.
