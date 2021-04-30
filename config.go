@@ -7,11 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type Config struct {
+// TaskConfig contains all options of a TaskManager.
+type TaskConfig struct {
 	// must provide, db for async task table
 	DB *gorm.DB
 	// must provide, async task table name
-	TableName string
+	Table string
 
 	// optional, context for the task mansger
 	Context context.Context
@@ -38,16 +39,16 @@ type Config struct {
 	// optional, goroutine pool size for scheduling tasks
 	PoolSize int
 
-	// TODO: log level
-
-	cancelFunc context.CancelFunc
+	// inner use
+	taskRegister taskRegister
+	cancelFunc   context.CancelFunc
 }
 
-func (s *Config) init() error {
+func (s *TaskConfig) init() error {
 	if s.DB == nil {
-		return ErrConfigNilDBFactory
+		return ErrConfigNilDB
 	}
-	if s.TableName == "" {
+	if s.Table == "" {
 		return ErrConfigEmptyTable
 	}
 
@@ -77,13 +78,16 @@ func (s *Config) init() error {
 		s.InitializedTimeout = defaultInitializedTimeout
 	}
 	if s.CtxMarshaler == nil {
-		s.CtxMarshaler = defaultCtxMarshaler{}
+		s.CtxMarshaler = &defaultCtxMarshaler{}
 	}
 	if s.CheckCallback == nil {
 		s.CheckCallback = defaultCheckCallback(s.logger())
 	}
 	if s.PoolSize <= 0 {
 		s.PoolSize = defaultPoolSize
+	}
+	if s.taskRegister == nil {
+		s.taskRegister = &taskRegisterImp{}
 	}
 
 	// check
@@ -106,25 +110,34 @@ func (s *Config) init() error {
 	return nil
 }
 
-func (s *Config) load(options ...Option) *Config {
+func (s *TaskConfig) load(options ...Option) *TaskConfig {
 	for _, option := range options {
 		option(s)
 	}
 	return s
 }
 
-func (s *Config) logger() Logger {
+func (s *TaskConfig) logger() Logger {
 	return s.LoggerFactory(s.Context)
 }
 
-func (s *Config) done() <-chan struct{} {
+func (s *TaskConfig) done() <-chan struct{} {
 	return s.Context.Done()
 }
 
-func (s *Config) cancel() {
+func (s *TaskConfig) cancel() {
 	s.cancelFunc()
 }
 
+func newConfig(db *gorm.DB, table string, options ...Option) (*TaskConfig, error) {
+	c := (&TaskConfig{}).load(options...).load(withDB(db)).load(withTable(table))
+	if err := c.init(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// logger is a logging interface for logging necessary messages.
 type Logger interface {
 	Printf(format string, args ...interface{})
 	Infof(format string, args ...interface{})
@@ -132,63 +145,95 @@ type Logger interface {
 	Errorf(format string, args ...interface{})
 }
 
+// CtxMarshaler is used to marshal or unmarshal context.
 type CtxMarshaler interface {
 	MarshalCtx(ctx context.Context) ([]byte, error)
 	UnmarshalCtx(bytes []byte) (context.Context, error)
 }
 
 // Option represents the optional function.
-type Option func(c *Config)
+type Option func(c *TaskConfig)
 
 // WithConfig set the whole config.
-func WithConfig(config Config) Option {
-	return func(c *Config) { *c = config }
+func WithConfig(config TaskConfig) Option {
+	return func(c *TaskConfig) { *c = config }
 }
 
+// WithDBTable set the database and table.
+func WithDBTable(db *gorm.DB, table string) Option {
+	return func(c *TaskConfig) { c.DB = db; c.Table = table }
+}
+
+// WithContext set the Context option.
 func WithContext(ctx context.Context) Option {
-	return func(c *Config) { c.Context = ctx }
+	return func(c *TaskConfig) { c.Context = ctx }
 }
 
+// WithLoggerFactory set the LoggerFactory option.
 func WithLoggerFactory(f func(ctx context.Context) Logger) Option {
-	return func(c *Config) { c.LoggerFactory = f }
+	return func(c *TaskConfig) { c.LoggerFactory = f }
 }
 
+// WithStorageTimeout set the StorageTimeout option.
 func WithStorageTimeout(d time.Duration) Option {
-	return func(c *Config) { c.StorageTimeout = d }
+	return func(c *TaskConfig) { c.StorageTimeout = d }
 }
 
+// WithInitializedTimeout set the InitializedTimeout option.
 func WithInitializedTimeout(d time.Duration) Option {
-	return func(c *Config) { c.InitializedTimeout = d }
+	return func(c *TaskConfig) { c.InitializedTimeout = d }
 }
 
+// WithRunningTimeout set the RunningTimeout option.
 func WithRunningTimeout(d time.Duration) Option {
-	return func(c *Config) { c.RunningTimeout = d }
+	return func(c *TaskConfig) { c.RunningTimeout = d }
 }
 
+// WithWaitTimeout set the WaitTimeout option.
 func WithWaitTimeout(d time.Duration) Option {
-	return func(c *Config) { c.WaitTimeout = d }
+	return func(c *TaskConfig) { c.WaitTimeout = d }
 }
 
+// WithScanInterval set the ScanInterval option.
 func WithScanInterval(d time.Duration) Option {
-	return func(c *Config) { c.ScanInterval = d }
+	return func(c *TaskConfig) { c.ScanInterval = d }
 }
 
+// WithInstantScanInterval set the InstantScanInvertal option.
 func WithInstantScanInterval(d time.Duration) Option {
-	return func(c *Config) { c.InstantScanInvertal = d }
+	return func(c *TaskConfig) { c.InstantScanInvertal = d }
 }
 
+// WithCtxMarshaler set the CtxMarshaler option.
 func WithCtxMarshaler(m CtxMarshaler) Option {
-	return func(c *Config) { c.CtxMarshaler = m }
+	return func(c *TaskConfig) { c.CtxMarshaler = m }
 }
 
+// WithCheckCallback set the CheckCallback option.
 func WithCheckCallback(f func(abnormalTasks []Task)) Option {
-	return func(c *Config) { c.CheckCallback = f }
+	return func(c *TaskConfig) { c.CheckCallback = f }
 }
 
+// WithDryRun set the DryRun option.
 func WithDryRun(flag bool) Option {
-	return func(c *Config) { c.DryRun = flag }
+	return func(c *TaskConfig) { c.DryRun = flag }
 }
 
+// WithPoolSize set the PoolSize option.
 func WithPoolSize(size int) Option {
-	return func(c *Config) { c.PoolSize = size }
+	return func(c *TaskConfig) { c.PoolSize = size }
+}
+
+func withDB(db *gorm.DB) Option {
+	return func(c *TaskConfig) { c.DB = db }
+}
+
+func withTable(table string) Option {
+	return func(c *TaskConfig) { c.Table = table }
+}
+
+func withTaskRegister(tr taskRegister) Option {
+	return func(c *TaskConfig) {
+		c.taskRegister = tr
+	}
 }

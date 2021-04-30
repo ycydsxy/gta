@@ -6,29 +6,26 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 var (
-	defaultTableName           = "default_table_name"
-	defaultDB                  = &gorm.DB{}
-	defaultStorageTimeout      = 7 * 24 * time.Hour
-	defaultWaitTimeout         = 0 * time.Second
-	defaultScanInterval        = 5 * time.Second
-	defaultInstantScanInvertal = 100 * time.Millisecond
-	defaultRunningTimeout      = 30 * time.Minute
-	defaultInitializedTimeout  = 5 * time.Minute
+	defaultStorageTimeout      = time.Hour * 7 * 24
+	defaultWaitTimeout         = time.Second * 0
+	defaultScanInterval        = time.Second * 5
+	defaultInstantScanInvertal = time.Millisecond * 100
+	defaultRunningTimeout      = time.Minute * 30
+	defaultInitializedTimeout  = time.Minute * 5
 	defaultPoolSize            = ants.DefaultAntsPoolSize
 	defaultRetryInterval       = time.Second
 )
 
 type defaultCtxMarshaler struct{}
 
-func (s defaultCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
+func (s *defaultCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
 	return nil, nil
 }
 
-func (s defaultCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
+func (s *defaultCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
 	return context.Background(), nil
 }
 

@@ -1,4 +1,4 @@
-package gta
+package gta_test
 
 import (
 	"context"
@@ -17,6 +17,8 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	. "gta"
 )
 
 const (
@@ -60,9 +62,7 @@ func TestMainProcess(t *testing.T) {
 	}
 
 	// normal init
-	StartWithConfig(Config{
-		TableName:          "async_task_test",
-		DB:                 db.Debug(),
+	StartWithOptions(db.Debug(), "async_task_test", WithConfig(TaskConfig{
 		LoggerFactory:      loggerFactory,
 		Context:            rootContext(),
 		CtxMarshaler:       testCtxMarshaler{},
@@ -71,7 +71,7 @@ func TestMainProcess(t *testing.T) {
 		RunningTimeout:     time.Second * 8,
 		StorageTimeout:     time.Second * 30,
 		PoolSize:           5,
-	})
+	}))
 
 	// biz process
 	convey.Convey("TestMainProcess", t, func() {
@@ -246,12 +246,12 @@ func TestMainProcess(t *testing.T) {
 
 		convey.Convey("TestForceRerunTask", func() {
 			convey.Convey("normal", func() {
-				err := ForceRerunTask(10003, taskStatusFailed)
+				err := ForceRerunTask(10003, TaskStatusFailed)
 				convey.So(err, convey.ShouldBeNil)
 			})
 
 			convey.Convey("error", func() {
-				err := ForceRerunTask(0, taskStatusFailed)
+				err := ForceRerunTask(0, TaskStatusFailed)
 				convey.So(err, convey.ShouldNotBeNil)
 			})
 		})

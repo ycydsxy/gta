@@ -13,7 +13,7 @@ type taskAssembler interface {
 }
 
 type taskAssemblerImp struct {
-	config *Config
+	config *TaskConfig
 }
 
 func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (task *Task, err error) {
@@ -30,14 +30,14 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 		return nil, fmt.Errorf("get argBytes failed, err: %w", err)
 	}
 
-	ctxBytes, err := taskDef.GetCtxMarshaler(s.config).MarshalCtx(ctxIn)
+	ctxBytes, err := taskDef.ctxMarshaler(s.config).MarshalCtx(ctxIn)
 	if err != nil {
 		return nil, fmt.Errorf("get ctxBytes failed, err: %w", err)
 	}
 	task = &Task{
 		ID:         taskDef.taskID,
 		TaskKey:    taskDef.key,
-		TaskStatus: taskStatusUnKnown,
+		TaskStatus: TaskStatusUnKnown,
 		Context:    ctxBytes,
 		Argument:   argBytes,
 	}
@@ -45,7 +45,7 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 }
 
 func (s *taskAssemblerImp) DisassembleTask(taskDef *TaskDefinition, task *Task) (context.Context, interface{}, error) {
-	ctxIn, err := taskDef.GetCtxMarshaler(s.config).UnmarshalCtx(task.Context)
+	ctxIn, err := taskDef.ctxMarshaler(s.config).UnmarshalCtx(task.Context)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unmarshal task context error: %w", err)
 	}

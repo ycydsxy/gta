@@ -12,27 +12,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewTaskManager(db *gorm.DB, tableName string, options ...Option) *TaskManager {
-	tc := &Config{DB: db, TableName: tableName}
-	if err := tc.load(options...).init(); err != nil {
-		panic(err)
-	}
-
-	tr := &taskRegisterImp{}
-	tdal := &taskDALImp{config: tc}
-	tass := &taskAssemblerImp{config: tc}
-	pool, err := ants.NewPool(tc.PoolSize, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
-	if err != nil {
-		panic(err)
-	}
-	tsch := &taskSchedulerImp{config: tc, register: tr, dal: tdal, assembler: tass, pool: pool}
-	tmon := &taskMonitorImp{config: tc, register: tr, dal: tdal, assembler: tass}
-	tscn := &taskScannerImp{config: tc, register: tr, dal: tdal, scheduler: tsch}
-	return &TaskManager{tc: tc, tr: tr, tass: tass, tsch: tsch, tdal: tdal, tmon: tmon, tscn: tscn}
-}
-
+// TaskManager is the overall processor of task, which includes scheduler, scanner and other components
 type TaskManager struct {
-	tc   *Config
+	tc   *TaskConfig
 	tr   taskRegister
 	tass taskAssembler
 	tsch taskScheduler
@@ -44,6 +26,7 @@ type TaskManager struct {
 	stopOnce  sync.Once
 }
 
+// Start starts the TaskManager. This function should be called before any other functions in a TaskManager is called.
 func (s *TaskManager) Start() {
 	s.startOnce.Do(func() {
 		if s.tc.DryRun {
@@ -74,11 +57,11 @@ func (s *TaskManager) Register(key TaskKey, definition TaskDefinition) {
 // ){}' when you need to care about the ultimate success of a task.
 
 // An error is returned when the task creating process failed, otherwise, the task will be scheduled asynchronously
-// later. If error or panic occurs in the running process, it will be rescheduled according to the config. If the
-// retry times exceeds the maximum config value, the task is marked 'failed' in the database with error logs recorded.
-// In these cases, maybe a manual operation is essential.
+// later. If error or panic occurs in the running process, it will be rescheduled according to the 'RetryTimes' value.
+// If the retry times exceeds the maximum config value, the task is marked 'failed' in the database with error logs
+// recorded. In these cases, maybe a manual operation is essential.
 //
-// The context passed in should be consistent with the 'CtxMarshaler' config defined in the overall configuration or the
+// The context passed in should be consistent with the 'CtxMarshaler' value defined in the overall configuration or the
 // task definition.
 func (s *TaskManager) Run(ctx context.Context, key TaskKey, arg interface{}) error {
 	return s.Transaction(func(tx *gorm.DB) error { return s.RunWithTx(tx, ctx, key, arg) })
@@ -122,6 +105,8 @@ func (s *TaskManager) Transaction(fc func(tx *gorm.DB) error) (err error) {
 // cases when a termination signal is received or the pod is migrated, it would be better to explicitly call this
 // function before the main process exits. Otherwise, these tasks are easily to be killed and will be reported by
 // abnormal task check process later.
+//
+// The wait parameter determines whether to wait for all running tasks to complete.
 func (s *TaskManager) Stop(wait bool) {
 	s.stopOnce.Do(func() {
 		if s.tc.DryRun {
@@ -151,14 +136,14 @@ func (s *TaskManager) ForceRerunTask(taskID uint64, status TaskStatus) error {
 	if err != nil {
 		return err
 	} else if rows != 1 {
-		return ErrNotUpdated
+		return ErrZeroRowsAffected
 	}
 	return nil
 }
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return s.tdal.UpdateStatusByIDs(s.tc.DB, taskIDs, status, taskStatusInitialized)
+	return s.tdal.UpdateStatusByIDs(s.tc.DB, taskIDs, status, TaskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
@@ -169,4 +154,26 @@ func (s *TaskManager) QueryUnsuccessfulTasks() ([]Task, error) {
 func (s *TaskManager) registerBuiltinTasks() {
 	registerCleanUpTask(s)
 	registerCheckAbnormalTask(s)
+}
+
+// NewTaskManager generates a new instance of TaskManager.
+//
+// The database and task table must be provided because this tool relies heavily on the database. For more information
+// about the table schema, please refer to 'model.sql'.
+func NewTaskManager(db *gorm.DB, table string, options ...Option) *TaskManager {
+	tc, err := newConfig(db, table, options...)
+	if err != nil {
+		panic(err)
+	}
+	tr := tc.taskRegister
+	tdal := &taskDALImp{config: tc}
+	tass := &taskAssemblerImp{config: tc}
+	pool, err := ants.NewPool(tc.PoolSize, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
+	if err != nil {
+		panic(err)
+	}
+	tsch := &taskSchedulerImp{config: tc, register: tr, dal: tdal, assembler: tass, pool: pool}
+	tmon := &taskMonitorImp{config: tc, register: tr, dal: tdal, assembler: tass}
+	tscn := &taskScannerImp{config: tc, register: tr, dal: tdal, scheduler: tsch}
+	return &TaskManager{tc: tc, tr: tr, tass: tass, tsch: tsch, tdal: tdal, tmon: tmon, tscn: tscn}
 }

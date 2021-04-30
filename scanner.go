@@ -1,6 +1,7 @@
 package gta
 
 import (
+	"sync/atomic"
 	"time"
 )
 
@@ -9,11 +10,11 @@ type taskScanner interface {
 }
 
 type taskScannerImp struct {
-	config      *Config
+	config      *TaskConfig
 	register    taskRegister
 	dal         taskDAL
 	scheduler   taskScheduler
-	instantScan bool
+	instantScan atomic.Value
 }
 
 func (s *taskScannerImp) GoScanAndSchedule() {
@@ -45,7 +46,7 @@ func (s *taskScannerImp) scanAndSchedule() {
 
 	task, err := s.claimInitializedTask()
 	if err != nil {
-		// no task remained or other error occured, i.e. the db has gone
+		// no task remained or other error occurred, i.e. the db has gone
 		if err != ErrTaskNotFound {
 			logger.Errorf("[scanAndSchedule] claim task err, err[%v]", err)
 		}
@@ -59,18 +60,26 @@ func (s *taskScannerImp) scanAndSchedule() {
 }
 
 func (s *taskScannerImp) scanInterval() time.Duration {
-	if s.instantScan {
+	if s.needInstantScan() {
 		return randomInterval(s.config.InstantScanInvertal)
 	}
 	return randomInterval(s.config.ScanInterval)
 }
 
+func (s *taskScannerImp) needInstantScan() bool {
+	iv := s.instantScan.Load()
+	if iv == nil {
+		return false
+	}
+	return iv.(bool)
+}
+
 func (s *taskScannerImp) switchOffInstantScan() {
-	s.instantScan = false
+	s.instantScan.Store(false)
 }
 
 func (s *taskScannerImp) switchOnInstantScan() {
-	s.instantScan = true
+	s.instantScan.Store(true)
 }
 
 func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
@@ -90,7 +99,7 @@ func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
 		// abort claim when cancel signal received
 		return nil, nil
 	default:
-		if err := s.scheduler.StartRunning(task); err == ErrNotUpdated {
+		if err := s.scheduler.StartRunning(task); err == ErrZeroRowsAffected {
 			// task is claimed by others, ignore error
 			return nil, nil
 		} else if err != nil {

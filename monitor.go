@@ -11,7 +11,7 @@ type taskMonitor interface {
 }
 
 type taskMonitorImp struct {
-	config    *Config
+	config    *TaskConfig
 	register  taskRegister
 	dal       taskDAL
 	assembler taskAssembler
@@ -52,7 +52,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 		logger.Errorf("[monitorBuiltinTask] assemble buitin task failed, err[%v], task_key[%v]", err, taskDef.key)
 		return
 	}
-	newTask.TaskStatus = taskStatusInitialized
+	newTask.TaskStatus = TaskStatusInitialized
 
 	if err := s.config.DB.Transaction(func(tx *gorm.DB) error {
 		if task, err := s.dal.GetForUpdate(tx, taskDef.taskID); err != nil {
@@ -67,7 +67,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 		if rows, err := s.dal.Update(tx, newTask); err != nil {
 			return err
 		} else if rows <= 0 {
-			return ErrNotUpdated
+			return ErrZeroRowsAffected
 		}
 		return nil
 	}); err == ErrTaskNotFound {
@@ -84,9 +84,9 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 func (s *taskMonitorImp) needLoopBuiltinTask(task *Task, taskDef *TaskDefinition) bool {
 	// normal loop if task_status is succeeded or failed
 	needNormalLoop := time.Since(task.UpdatedAt) >= taskDef.loopInterval && (
-		task.TaskStatus == taskStatusSucceeded || task.TaskStatus == taskStatusFailed)
+		task.TaskStatus == TaskStatusSucceeded || task.TaskStatus == TaskStatusFailed)
 	// force loop if abnormal running found
-	needForceLoop := time.Since(task.UpdatedAt) >= s.config.RunningTimeout && task.TaskStatus == taskStatusRunning
+	needForceLoop := time.Since(task.UpdatedAt) >= s.config.RunningTimeout && task.TaskStatus == TaskStatusRunning
 
 	return needNormalLoop || needForceLoop
 }

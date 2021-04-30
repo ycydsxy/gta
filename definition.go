@@ -6,8 +6,10 @@ import (
 	"time"
 )
 
+// TaskHandler is a handler to a certain task
 type TaskHandler func(ctx context.Context, arg interface{}) (err error)
 
+// TaskDefinition is a definition of a certain task
 type TaskDefinition struct {
 	// must provide, task handler
 	Handler TaskHandler
@@ -35,20 +37,6 @@ type TaskDefinition struct {
 	key TaskKey
 }
 
-func (s *TaskDefinition) GetCtxMarshaler(config *Config) CtxMarshaler {
-	if m := s.CtxMarshaler; m != nil {
-		return m
-	}
-	return config.CtxMarshaler
-}
-
-func (s *TaskDefinition) GetRetryInterval(times int) time.Duration {
-	if f := s.RetryInterval; f != nil {
-		return f(times)
-	}
-	return defaultRetryInterval
-}
-
 func (s *TaskDefinition) init(key TaskKey) error {
 	if s.Handler == nil {
 		return ErrDefNilHandler
@@ -66,4 +54,18 @@ func (s *TaskDefinition) init(key TaskKey) error {
 	}
 	s.key = key
 	return nil
+}
+
+func (s *TaskDefinition) ctxMarshaler(config *TaskConfig) CtxMarshaler {
+	if m := s.CtxMarshaler; m != nil {
+		return m
+	}
+	return config.CtxMarshaler
+}
+
+func (s *TaskDefinition) retryInterval(times int) time.Duration {
+	if f := s.RetryInterval; f != nil {
+		return f(times)
+	}
+	return defaultRetryInterval
 }

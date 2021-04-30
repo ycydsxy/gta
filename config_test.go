@@ -5,37 +5,41 @@ import (
 	"time"
 
 	"github.com/smartystreets/goconvey/convey"
+	"gorm.io/gorm"
 )
 
 func Test_Config_init(t *testing.T) {
+	defaultDB := &gorm.DB{}
+	defaultTable := "async_task_test"
+
 	convey.Convey("Test_Config_init", t, func() {
 		convey.Convey("normal process", func() {
-			tc := Config{DB: defaultDB, TableName: defaultTableName}
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable}
 			convey.So(tc.init(), convey.ShouldBeNil)
 		})
 
 		convey.Convey("empty table name", func() {
-			tc := Config{}
+			tc := TaskConfig{}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("empty db factory", func() {
-			tc := Config{TableName: defaultTableName}
+			tc := TaskConfig{Table: defaultTable}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("invalid running timeout", func() {
-			tc := Config{DB: defaultDB, TableName: defaultTableName, RunningTimeout: time.Hour * 365}
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable, RunningTimeout: time.Hour * 365}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("invalid initialized timeout", func() {
-			tc := Config{DB: defaultDB, TableName: defaultTableName, InitializedTimeout: time.Hour * 365}
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable, InitializedTimeout: time.Hour * 365}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("invalid scan interval", func() {
-			tc := Config{DB: defaultDB, TableName: defaultTableName, ScanInterval: time.Hour * 365}
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable, ScanInterval: time.Hour * 365}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 

@@ -7,17 +7,20 @@ import (
 )
 
 const (
-	taskStatusUnKnown     TaskStatus = ""
-	taskStatusInitialized TaskStatus = "initialized"
-	taskStatusRunning     TaskStatus = "running"
-	taskStatusSucceeded   TaskStatus = "succeeded"
-	taskStatusFailed      TaskStatus = "failed"
+	TaskStatusUnKnown     TaskStatus = ""
+	TaskStatusInitialized TaskStatus = "initialized"
+	TaskStatusRunning     TaskStatus = "running"
+	TaskStatusSucceeded   TaskStatus = "succeeded"
+	TaskStatusFailed      TaskStatus = "failed"
 )
 
+// Taskkey is a unique ID for a set of tasks with same definition.
 type TaskKey string
 
+// TaskStatus represents the status of a task.
 type TaskStatus string
 
+// Task is an entity in database.
 type Task struct {
 	ID         uint64
 	TaskKey    TaskKey
@@ -29,14 +32,15 @@ type Task struct {
 	UpdatedAt  time.Time
 }
 
-type TaskExtra struct {
-	// ErrStrs []string TODO: need store errStrs
-}
+// TaskExtra contains other information of a task.
+type TaskExtra struct{}
 
+// Value implements Valuer.
 func (s TaskExtra) Value() (driver.Value, error) {
 	return json.Marshal(s)
 }
 
+// Scan implements Scanner.
 func (s *TaskExtra) Scan(v interface{}) error {
 	if v == nil {
 		return nil
