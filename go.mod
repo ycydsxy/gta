@@ -1,4 +1,4 @@
-module gta
+module github.com/ycydsxy/gta
 
 go 1.13
 
