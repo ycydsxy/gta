@@ -1,4 +1,4 @@
-package gta_test
+package gta
 
 import (
 	"context"
@@ -17,8 +17,6 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-
-	. "gta"
 )
 
 const (
