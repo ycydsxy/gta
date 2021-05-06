@@ -11,7 +11,7 @@ A lightweight and reliable asynchronous task and transaction message library for
 [![GitHub license](https://img.shields.io/github/license/ycydsxy/gta)](https://github.com/ycydsxy/gta/blob/main/LICENSE)
 
 ## Overview
-GTA (go task async) is a lightweight and reliable asynchronous task and transaction message library for by golang. The framework has the following characteristics：
+GTA (Go Task Async) is a lightweight and reliable asynchronous task and transaction message library for by golang. The framework has the following characteristics：
 - High reliability: ensure the scheduling and execution of asynchronous tasks At Least Once, and the status of all submitted tasks can be traced back
 - Flexible configuration: it provides a number of simple and easy-to-use optional configuration items, which can better fit the needs of different situations
 - Allow to submit multiple tasks: allow to submit multiple tasks in the same transaction (it is not guaranteed that the tasks will be executed in the order of submission)
