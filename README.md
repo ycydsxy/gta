@@ -1,6 +1,6 @@
 # GTA - Go Task Async
 
-A lightweight and reliable asynchronous task and transaction message library for Golang. [🇺🇸English | [🇨🇳中文](README_zh-CN.md)]
+A lightweight and reliable asynchronous task and transaction message library for Golang.&nbsp;&nbsp;[🇺🇸English | [🇨🇳中文](README_zh-CN.md)]
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/ycydsxy/gta)](https://goreportcard.com/report/github.com/ycydsxy/gta)
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ycydsxy/gta/Go?logo=github)](https://github.com/ycydsxy/gta/actions/workflows/go.yml)
