@@ -10,7 +10,7 @@ import (
 
 func Test_Config_init(t *testing.T) {
 	defaultDB := &gorm.DB{}
-	defaultTable := "async_task_test"
+	defaultTable := "tasks"
 
 	convey.Convey("Test_Config_init", t, func() {
 		convey.Convey("normal process", func() {

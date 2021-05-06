@@ -60,7 +60,7 @@ func TestMainProcess(t *testing.T) {
 	}
 
 	// normal init
-	StartWithOptions(db.Debug(), "async_task_test", WithConfig(TaskConfig{
+	StartWithOptions(db.Debug(), "tasks", WithConfig(TaskConfig{
 		LoggerFactory:      loggerFactory,
 		Context:            rootContext(),
 		CtxMarshaler:       testCtxMarshaler{},

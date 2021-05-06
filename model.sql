@@ -1,5 +1,5 @@
 /* -------------------- TABLE SCHEMA --------------------- */
-CREATE TABLE `async_task_test` (
+CREATE TABLE `tasks` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `task_key` varchar(64) NOT NULL DEFAULT '',
   `task_status` varchar(64) NOT NULL DEFAULT '',
