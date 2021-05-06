@@ -72,7 +72,8 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 			return err
 		}
 	default:
-		if toScheduleTasks, ok := tx.Get(transactionKey); ok { // buitin transaction, create running task
+		if toScheduleTasks, ok := tx.Get(transactionKey); ok {
+			// buitin transaction, try to create running task
 			if !s.config.DryRun {
 				if s.CanSchedule() {
 					if err := s.createRunningTask(tx, task); err != nil {
@@ -287,7 +288,7 @@ func (s *taskSchedulerImp) createRunningTask(tx *gorm.DB, task *Task) error {
 	if err := s.dal.Create(tx, task); err != nil {
 		return err
 	}
-	s.markRunning(task)
+	s.markRunning(task) // FIXME: task remove when transaction failed
 	return nil
 }
 
@@ -295,7 +296,7 @@ func (s *taskSchedulerImp) markRunning(task *Task) {
 	s.runningMap.Store(task.ID, nil)
 }
 
-func (s *taskSchedulerImp) unmarkRunning(task *Task) {
+func (s *taskSchedulerImp) unmarkRunning(task *Task) { // TODO: safely exit matters
 	s.runningMap.Delete(task.ID)
 }
 
