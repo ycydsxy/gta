@@ -1,6 +1,6 @@
 # GTA - Go Task Async
 
-一个轻量的可靠异步任务和事务消息框架
+一个轻量的可靠异步任务和事务消息框架&nbsp;&nbsp;[[🇺🇸English](README_zh-CN.md) | 🇨🇳中文]
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/ycydsxy/gta)](https://goreportcard.com/report/github.com/ycydsxy/gta)
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ycydsxy/gta/Go?logo=github)](https://github.com/ycydsxy/gta/actions/workflows/go.yml)
