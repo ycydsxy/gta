@@ -12,15 +12,15 @@ A lightweight and reliable asynchronous task and transaction message library for
 
 ## Overview
 GTA (go task async) is a lightweight and reliable asynchronous task and transaction message library for by golang. The framework has the following characteristics：
--High reliability: ensure the scheduling and execution of asynchronous tasks At Least Once, and the status of all submitted tasks can be traced back
--Flexible configuration: it provides a number of simple and easy-to-use optional configuration items, which can better fit the needs of different situations
--Allow to submit multiple tasks: allow to submit multiple tasks in the same transaction (it is not guaranteed that the tasks will be executed in the order of submission)
--Allow to submit nested tasks: allow to submit new asynchronous tasks among submitted tasks (ensure that tasks are executed in the order of submission)
--Multiple scheduling methods: one is low latency scheduling similar to 'Commit Hook' mechanism and the other is preemptive scheduling based on scan mechanism. The former gives priority to the current instance, while the latter's scheduling right depends on the result of multi instance competition
--Built in tasks: provide multiple built-in tasks running on this framework for abnormal task monitoring, historical task cleaning, etc
--Graceful stop: provide graceful stop mechanism, try not to let the running task be stopped violently when the instance exits
--Pooling: the bottom layer uses the goroutine pool to run asynchronous tasks, and the size of the coroutine pool can be configured
--Lightweight: external dependence has and only has [Gorm]（ https://github.com/go-gorm/gorm ）and relational database
+- High reliability: ensure the scheduling and execution of asynchronous tasks At Least Once, and the status of all submitted tasks can be traced back
+- Flexible configuration: it provides a number of simple and easy-to-use optional configuration items, which can better fit the needs of different situations
+- Allow to submit multiple tasks: allow to submit multiple tasks in the same transaction (it is not guaranteed that the tasks will be executed in the order of submission)
+- Allow to submit nested tasks: allow to submit new asynchronous tasks among submitted tasks (ensure that tasks are executed in the order of submission)
+- Multiple scheduling methods: one is low latency scheduling similar to 'Commit Hook' mechanism and the other is preemptive scheduling based on scan mechanism. The former gives priority to the current instance, while the latter's scheduling right depends on the result of multi instance competition
+- Built in tasks: provide multiple built-in tasks running on this framework for abnormal task monitoring, historical task cleaning, etc
+- Graceful stop: provide graceful stop mechanism, try not to let the running task be stopped violently when the instance exits
+- Pooling: the bottom layer uses the goroutine pool to run asynchronous tasks, and the size of the coroutine pool can be configured
+- Lightweight: external dependence has and only has [Gorm]（ https://github.com/go-gorm/gorm ）and relational database
 
 Users can submit, schedule, execute and monitor asynchronous tasks through this framework. It relies on relational database to ensure the reliability and traceability of asynchronous tasks. It can be used in various situations that need to ensure the successful execution of tasks (try our best to ensure the success, unless the task itself or external resources are abnormal)
 
