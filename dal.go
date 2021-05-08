@@ -10,13 +10,13 @@ import (
 type taskDAL interface {
 	Create(tx *gorm.DB, task *Task) error
 
+	Get(tx *gorm.DB, id uint64) (*Task, error)
 	GetForUpdate(tx *gorm.DB, id uint64) (*Task, error)
 	GetInitialized(tx *gorm.DB, sensitiveKeys []TaskKey, offset time.Duration, insensitiveKeys []TaskKey) (*Task, error)
 	GetSliceByOffsetsAndStatus(tx *gorm.DB, startOffset, endOffset time.Duration, status TaskStatus) ([]Task, error)
 	GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey) ([]Task, error)
 
 	Update(tx *gorm.DB, task *Task) (int64, error)
-	UpdateStatus(tx *gorm.DB, task Task, newStatus TaskStatus) (int64, error)
 	UpdateStatusByIDs(tx *gorm.DB, taskIDs []uint64, ori TaskStatus, new TaskStatus) (int64, error)
 
 	DeleteSucceededByOffset(tx *gorm.DB, offset time.Duration, excludeKeys []TaskKey) (int64, error)
@@ -33,6 +33,16 @@ func (s *taskDALImp) tabledDB(tx *gorm.DB) *gorm.DB {
 
 func (s *taskDALImp) Create(tx *gorm.DB, task *Task) error {
 	return s.tabledDB(tx).Create(&task).Error
+}
+
+func (s *taskDALImp) Get(tx *gorm.DB, id uint64) (*Task, error) {
+	var rule Task
+	if err := s.tabledDB(tx).Where("id = ?", id).Take(&rule).Error; err == gorm.ErrRecordNotFound {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &rule, nil
 }
 
 func (s *taskDALImp) GetForUpdate(tx *gorm.DB, id uint64) (*Task, error) {
@@ -89,11 +99,6 @@ func (s *taskDALImp) GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey
 
 func (s *taskDALImp) Update(tx *gorm.DB, task *Task) (int64, error) {
 	db := s.tabledDB(tx).Updates(task)
-	return db.RowsAffected, db.Error
-}
-
-func (s *taskDALImp) UpdateStatus(tx *gorm.DB, task Task, newStatus TaskStatus) (int64, error) {
-	db := s.tabledDB(tx).Where("id = ? AND task_status = ?", task.ID, task.TaskStatus).Updates(&Task{TaskStatus: newStatus})
 	return db.RowsAffected, db.Error
 }
 

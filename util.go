@@ -1,12 +1,16 @@
 package gta
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"runtime/debug"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -32,4 +36,16 @@ func minInt64(i ...int64) int64 {
 		}
 	}
 	return min
+}
+
+func testDB(dbName string) *gorm.DB {
+	dbName = dbName + fmt.Sprintf("_%d.db", rand.Int())
+	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		panic(err)
+	}
+	if err = db.Migrator().AutoMigrate(&Task{}); err != nil {
+		panic(err)
+	}
+	return db
 }

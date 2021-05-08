@@ -99,12 +99,13 @@ func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
 		// abort claim when cancel signal received
 		return nil, nil
 	default:
-		if err := s.scheduler.StartRunning(task); err == ErrZeroRowsAffected {
+		if rowsAffected, err := s.dal.UpdateStatusByIDs(c.DB, []uint64{task.ID}, task.TaskStatus, TaskStatusRunning); err != nil {
+			return nil, err
+		} else if rowsAffected == 0 {
 			// task is claimed by others, ignore error
 			return nil, nil
-		} else if err != nil {
-			return nil, err
 		}
+		task.TaskStatus = TaskStatusRunning
 		return task, nil
 	}
 }

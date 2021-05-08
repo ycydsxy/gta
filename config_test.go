@@ -18,13 +18,13 @@ func Test_Config_init(t *testing.T) {
 			convey.So(tc.init(), convey.ShouldBeNil)
 		})
 
-		convey.Convey("empty table name", func() {
+		convey.Convey("empty db factory", func() {
 			tc := TaskConfig{}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
-		convey.Convey("empty db factory", func() {
-			tc := TaskConfig{Table: defaultTable}
+		convey.Convey("empty table name", func() {
+			tc := TaskConfig{DB: defaultDB}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 
@@ -40,6 +40,11 @@ func Test_Config_init(t *testing.T) {
 
 		convey.Convey("invalid scan interval", func() {
 			tc := TaskConfig{DB: defaultDB, Table: defaultTable, ScanInterval: time.Hour * 365}
+			convey.So(tc.init(), convey.ShouldNotBeNil)
+		})
+
+		convey.Convey("invalid instant scan interval", func() {
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable, InstantScanInvertal: time.Hour * 365}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 

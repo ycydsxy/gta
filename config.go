@@ -159,11 +159,6 @@ func WithConfig(config TaskConfig) Option {
 	return func(c *TaskConfig) { *c = config }
 }
 
-// WithDBTable set the database and table.
-func WithDBTable(db *gorm.DB, table string) Option {
-	return func(c *TaskConfig) { c.DB = db; c.Table = table }
-}
-
 // WithContext set the Context option.
 func WithContext(ctx context.Context) Option {
 	return func(c *TaskConfig) { c.Context = ctx }

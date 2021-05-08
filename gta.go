@@ -12,11 +12,11 @@ var (
 
 // StartWithOptions configures the default task manager and starts it. This function should be called before any other
 // function is called.
-func StartWithOptions(db *gorm.DB, tableName string, options ...Option) {
+func StartWithOptions(db *gorm.DB, table string, options ...Option) {
 	opts := make([]Option, len(options))
 	copy(opts, options)
 	opts = append(opts, withTaskRegister(defaultTaskManager.tr))
-	defaultTaskManager = NewTaskManager(db, tableName, opts...)
+	defaultTaskManager = NewTaskManager(db, table, opts...)
 	defaultTaskManager.Start()
 }
 

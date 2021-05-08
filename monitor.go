@@ -20,10 +20,7 @@ type taskMonitorImp struct {
 func (s *taskMonitorImp) GoMonitorBuiltinTasks() {
 	logger := s.config.logger()
 	for _, key := range s.register.GetBuiltInKeys() {
-		taskDef, err := s.register.GetDefinition(key)
-		if err != nil {
-			logger.Errorf("[GoMonitorBuiltinTasks] get task definition failed, err[%v], task_key[%v]", err, key)
-		}
+		taskDef, _ := s.register.GetDefinition(key)
 		s.goMonitorBuiltinTask(taskDef)
 		logger.Infof("[GoMonitorBuiltinTasks] monitor built-in task start, task_key[%v], monitor interval[%v]", taskDef.key, taskDef.loopInterval)
 	}

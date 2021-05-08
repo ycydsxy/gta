@@ -3,6 +3,7 @@ package gta
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -21,7 +22,6 @@ type taskScheduler interface {
 	Stop(wait bool)
 	GoScheduleTask(task *Task)
 	CanSchedule() bool
-	StartRunning(task *Task) error
 }
 
 type taskSchedulerImp struct {
@@ -59,7 +59,6 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 	if err != nil {
 		return err
 	}
-
 	task, err := s.assembler.AssembleTask(ctxIn, taskDef, arg)
 	if err != nil {
 		return err
@@ -88,6 +87,9 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 					}
 				}
 			} else {
+				// assign a dummy id to this task in dry run mode
+				task.ID = rand.Uint64()
+				task.TaskStatus = TaskStatusRunning
 				// task will be scheduled after the transaction succeeded
 				if _, loaded := toScheduleTasks.(*sync.Map).LoadOrStore(task.ID, task); loaded {
 					return ErrUnexpected
@@ -101,14 +103,19 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 				}
 			} else {
 				logger.Warnf("[CreateTask] Using dry run mode in non-builtin transaction, this task may be scheduled before the transaction is committed!")
+				// assign a dummy id to this task in dry run mode
+				task.ID = rand.Uint64()
+				task.TaskStatus = TaskStatusRunning
 				go func() {
 					// wait for committing the transaction in dry run mode
 					time.Sleep(time.Millisecond * 500)
+					// note that the task will still be scheduled when the transaction is rolled back in dry run mode
 					s.GoScheduleTask(task)
 				}()
 			}
 		}
 	}
+	// TODO: can roll back
 	logger.Infof("[CreateTask] async task created, task_key[%v], task_id[%v], task_status[%v]", key, task.ID, task.TaskStatus)
 	return nil
 }
@@ -150,6 +157,12 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 func (s *taskSchedulerImp) GoScheduleTask(task *Task) {
 	logger := s.config.logger()
 
+	if task.TaskStatus != TaskStatusRunning {
+		logger.Errorf("[GoScheduleTask] invalid task status, task_key[%v], task_status[%v]", task.TaskKey, task.TaskStatus)
+		return
+	}
+	s.markRunning(task)
+
 	f := func() {
 		defer panicHandler()
 		s.scheduleTask(task)
@@ -172,15 +185,11 @@ func (s *taskSchedulerImp) CanSchedule() bool {
 
 func (s *taskSchedulerImp) scheduleTask(task *Task) {
 	logger := s.config.logger()
-
-	taskDef, err := s.register.GetDefinition(task.TaskKey)
-	if err != nil {
-		logger.Errorf("[scheduleTask] get task definition failed, err[%v], task_key[%v], task_id[%v]", err, task.TaskKey, task.ID)
-		return
-	}
-
+	taskDef, _ := s.register.GetDefinition(task.TaskKey)
 	succeeded := false
 	startTime := time.Now()
+	logger.Infof("[scheduleTask] schedule task start, task_key[%v], task_id[%v]", task.TaskKey, task.ID)
+
 	defer func() {
 		var toStatus TaskStatus
 		cost := time.Since(startTime).Round(time.Millisecond)
@@ -191,15 +200,13 @@ func (s *taskSchedulerImp) scheduleTask(task *Task) {
 			toStatus = TaskStatusFailed
 			logger.Errorf("[scheduleTask] schedule task failed, cost[%v], task_key[%v], task_id[%v]", cost, task.TaskKey, task.ID)
 		}
-		if s.config.DryRun {
-			return
-		}
 		if err := s.stopRunning(task, taskDef, toStatus); err != nil {
 			logger.Errorf("[scheduleTask] change running task status error, err[%v], task_key[%v], task_id[%v]", err, task.TaskKey, task.ID)
 		}
+		task.TaskStatus = toStatus
+		s.unmarkRunning(task)
 	}()
 
-	logger.Infof("[scheduleTask] schedule task start, task_key[%v], task_id[%v]", task.TaskKey, task.ID)
 	for times := 0; times <= taskDef.RetryTimes; times++ {
 		if times > 0 {
 			time.Sleep(taskDef.retryInterval(times))
@@ -243,38 +250,21 @@ func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *Task) (err
 }
 
 func (s *taskSchedulerImp) stopRunning(task *Task, taskDef *TaskDefinition, toStatus TaskStatus) error {
-	if task.TaskStatus != TaskStatusRunning {
-		return fmt.Errorf("task status[%v] is not running", task.TaskStatus)
-	}
-	if taskDef.CleanSucceeded && toStatus == TaskStatusSucceeded {
-		if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.DB, task.ID, task.TaskStatus); err != nil {
-			return fmt.Errorf("clean task error: %w", err)
-		} else if rowsAffected == 0 {
-			return ErrZeroRowsAffected
+	if !s.config.DryRun {
+		if taskDef.CleanSucceeded && toStatus == TaskStatusSucceeded {
+			if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.DB, task.ID, task.TaskStatus); err != nil {
+				return err
+			} else if rowsAffected == 0 {
+				return ErrZeroRowsAffected
+			}
+		} else {
+			if rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, []uint64{task.ID}, task.TaskStatus, toStatus); err != nil {
+				return err
+			} else if rowsAffected == 0 {
+				return ErrZeroRowsAffected
+			}
 		}
-	} else {
-		if rowsAffected, err := s.dal.UpdateStatus(s.config.DB, *task, toStatus); err != nil {
-			return fmt.Errorf("update task status from %v to %v error: %w", task.TaskStatus, toStatus, err)
-		} else if rowsAffected == 0 {
-			return ErrZeroRowsAffected
-		}
 	}
-	task.TaskStatus = toStatus
-	s.unmarkRunning(task)
-	return nil
-}
-
-func (s *taskSchedulerImp) StartRunning(task *Task) error {
-	if task.TaskStatus == TaskStatusRunning {
-		return ErrUnexpected
-	}
-	if rowsAffected, err := s.dal.UpdateStatus(s.config.DB, *task, TaskStatusRunning); err != nil {
-		return fmt.Errorf("update task status from %v to %v error: %w", task.TaskStatus, TaskStatusRunning, err)
-	} else if rowsAffected == 0 {
-		return ErrZeroRowsAffected
-	}
-	task.TaskStatus = TaskStatusRunning
-	s.markRunning(task)
 	return nil
 }
 
@@ -285,18 +275,14 @@ func (s *taskSchedulerImp) createInitializedTask(tx *gorm.DB, task *Task) error 
 
 func (s *taskSchedulerImp) createRunningTask(tx *gorm.DB, task *Task) error {
 	task.TaskStatus = TaskStatusRunning
-	if err := s.dal.Create(tx, task); err != nil {
-		return err
-	}
-	s.markRunning(task) // FIXME: task remove when transaction failed
-	return nil
+	return s.dal.Create(tx, task)
 }
 
 func (s *taskSchedulerImp) markRunning(task *Task) {
 	s.runningMap.Store(task.ID, nil)
 }
 
-func (s *taskSchedulerImp) unmarkRunning(task *Task) { // TODO: safely exit matters
+func (s *taskSchedulerImp) unmarkRunning(task *Task) {
 	s.runningMap.Delete(task.ID)
 }
 
