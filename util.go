@@ -19,7 +19,7 @@ const (
 	randomIntervalFactor = 0.2
 )
 
-// randomInterval generates random interval in [interval,randomIntervalFactor*interval)
+// randomInterval generates random interval in [interval,interval+randomIntervalFactor*interval)
 func randomInterval(interval time.Duration) time.Duration {
 	return interval + time.Duration(randomIntervalFactor*rand.Float64()*float64(interval))
 }
@@ -42,13 +42,8 @@ func minInt64(i ...int64) int64 {
 
 func testDB(dbName string) *gorm.DB {
 	dbName = dbName + fmt.Sprintf("_%d.db", rand.Int())
-	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil {
-		panic(err)
-	}
-	if err = db.Migrator().AutoMigrate(&Task{}); err != nil {
-		panic(err)
-	}
+	db, _ := gorm.Open(sqlite.Open(dbName), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	_ = db.Migrator().AutoMigrate(&Task{})
 	return db
 }
 

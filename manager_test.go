@@ -3,11 +3,15 @@ package gta
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/smartystreets/goconvey/convey"
 	"gorm.io/gorm"
 )
@@ -557,4 +561,147 @@ func TestTaskManager_Others(t *testing.T) {
 			convey.So(t2Run, convey.ShouldEqual, 1)
 		})
 	})
+}
+
+func TestTaskManager_Race(t *testing.T) {
+	convey.Convey("TestTaskManager_FullProcess", t, func() {
+		db := testDB("TestTaskManager_FullProcess")
+		tmFactory := func(tag string) *TaskManager {
+			m := NewTaskManager(db, "tasks",
+				WithConfig(TaskConfig{}),
+				WithLoggerFactory(func(ctx context.Context) Logger {
+					fields := logrus.Fields{
+						"manager": tag,
+					}
+					if userID := ctx.Value("user_id"); userID != nil {
+						fields["user_id"] = userID
+					}
+					if requestID := ctx.Value("request_id"); requestID != nil {
+						fields["request_id"] = requestID
+					}
+					return logrus.WithFields(fields)
+				}),
+				WithContext(context.TODO()),
+				WithScanInterval(time.Second),
+				WithInstantScanInterval(time.Millisecond*100),
+				WithInitializedTimeout(time.Second*5),
+				WithRunningTimeout(time.Second*8),
+				WithStorageTimeout(time.Second*30),
+				WithPoolSize(5),
+			)
+			m.Register("t", TaskDefinition{
+				Handler: func(ctx context.Context, arg interface{}) (err error) {
+					return testTaskHandler(ctx, arg.(*testTaskArg))
+				},
+				ArgType:        reflect.TypeOf(&testTaskArg{}),
+				CtxMarshaler:   testTaskCtxMarshaler{},
+				RetryTimes:     1,
+				CleanSucceeded: true,
+			})
+			return m
+		}
+
+		var (
+			managers []*TaskManager
+		)
+		for i := 0; i < 10; i++ {
+			manager := tmFactory(fmt.Sprintf("m%d", i))
+			managers = append(managers, manager)
+			manager.Start()
+		}
+		m0 := managers[0]
+
+		// run
+		for i := 0; i < 5; i++ {
+			ctx := mockTaskContext(fmt.Sprintf("request_run_%d", i), fmt.Sprintf("user%d", i))
+			err := m0.Run(ctx, "t", &testTaskArg{A: i, B: 2 * i})
+			convey.So(err, convey.ShouldBeNil)
+		}
+
+		// run with tx - not builtin
+		for i := 0; i < 5; i++ {
+			ctx := mockTaskContext(fmt.Sprintf("request_tx_nonbuiltin_%d", i), fmt.Sprintf("user%d", i))
+			err := m0.tc.DB.Transaction(func(tx *gorm.DB) error {
+				if err := m0.RunWithTx(tx, ctx, "t", &testTaskArg{A: i, B: 2 * i}); err != nil {
+					return err
+				}
+				return nil
+			})
+			convey.So(err, convey.ShouldBeNil)
+		}
+
+		// run with tx - builtin
+		for i := 0; i < 5; i++ {
+			ctx := mockTaskContext(fmt.Sprintf("request_tx_builtin_%d", i), fmt.Sprintf("user%d", i))
+			err := m0.Transaction(func(tx *gorm.DB) error {
+				if err := m0.RunWithTx(tx, ctx, "t", &testTaskArg{A: i, B: 2 * i}); err != nil {
+					return err
+				}
+				return nil
+			})
+			convey.So(err, convey.ShouldBeNil)
+		}
+
+		// long task
+		err := m0.Run(mockTaskContext("request_long_task", "user_id_0"), "t", &testTaskArg{A: 21, B: 100})
+		convey.So(err, convey.ShouldBeNil)
+
+		// sleep and stop
+		time.Sleep(time.Second * 10)
+		for _, m := range managers {
+			m.Stop(false)
+		}
+
+		// after stop
+		for i := 0; i < 5; i++ {
+			ctx := mockTaskContext("request_ctx_cancelled", "user_id_0")
+			err := m0.Run(ctx, "t", &testTaskArg{})
+			convey.So(err, convey.ShouldBeNil)
+		}
+	})
+}
+
+type testTaskArg struct {
+	A int
+	B int
+}
+
+func testTaskHandler(ctx context.Context, req *testTaskArg) error {
+	time.Sleep(time.Second * time.Duration(req.B))
+	if req.A%5 == 1 {
+		// mock error
+		return errors.New("test error")
+	}
+	return nil
+}
+
+type testTaskCtxMarshaler struct {
+	ReqestID string `json:"reqest_id"`
+	UserID   string `json:"user_id"`
+}
+
+func (t testTaskCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
+	c := testTaskCtxMarshaler{}
+	if requestID := ctx.Value("request_id"); requestID != nil {
+		c.ReqestID = requestID.(string)
+	}
+	if userID := ctx.Value("user_id"); userID != nil {
+		c.UserID = userID.(string)
+	}
+	return json.Marshal(c)
+}
+
+func (t testTaskCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
+	var c testTaskCtxMarshaler
+	if err := json.Unmarshal(bytes, &c); err != nil {
+		return nil, err
+	}
+	return mockTaskContext(c.ReqestID, c.UserID), nil
+}
+
+func mockTaskContext(requestID string, userID string) context.Context {
+	ctx := context.TODO()
+	ctx = context.WithValue(ctx, "request_id", requestID)
+	ctx = context.WithValue(ctx, "user_id", userID)
+	return ctx
 }
