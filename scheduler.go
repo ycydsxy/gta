@@ -122,7 +122,6 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 
 func (s *taskSchedulerImp) Stop(wait bool) {
 	defer s.pool.Release()
-
 	logger := s.config.logger()
 
 	// first check, if tasks len is zero, return immediately
@@ -130,7 +129,6 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 	if len(taskIDs) <= 0 {
 		return
 	}
-
 	// loop check and wait
 	waitStart := time.Now()
 	for {

@@ -113,6 +113,10 @@ func TestTaskManager_Run(t *testing.T) {
 			convey.So(err1, convey.ShouldBeNil)
 			convey.So(err2, convey.ShouldBeNil)
 			convey.So(t1Run, convey.ShouldEqual, 2)
+			task, err := m.tdal.Get(m.tc.DB, 10001)
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(task, convey.ShouldNotBeNil)
+			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
 		})
 
 		convey.Convey("with options", func() {
@@ -184,7 +188,7 @@ func TestTaskManager_Run(t *testing.T) {
 				err := m.Run(context.TODO(), "t1", nil)
 				m.Stop(true)
 				convey.So(err, convey.ShouldBeNil)
-				convey.So(t1Run, convey.ShouldEqual, 2)
+				convey.So(t1Run, convey.ShouldEqual, 1)
 				task, err := m.tdal.Get(m.tc.DB, 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldBeNil)
@@ -194,6 +198,7 @@ func TestTaskManager_Run(t *testing.T) {
 				var t1Run int64
 				m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run), InitTimeoutSensitive: true})
 				err1 := m.tdal.Create(m.tc.DB, &Task{
+					ID:         10001,
 					TaskKey:    "t1",
 					TaskStatus: TaskStatusInitialized,
 					Context:    nil,
@@ -203,6 +208,7 @@ func TestTaskManager_Run(t *testing.T) {
 					UpdatedAt:  time.Now().Add(-time.Hour),
 				})
 				err2 := m.tdal.Create(m.tc.DB, &Task{
+					ID:         10002,
 					TaskKey:    "t1",
 					TaskStatus: TaskStatusInitialized,
 					Context:    nil,
