@@ -1,10 +1,12 @@
 package gta
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
 	"runtime/debug"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -48,4 +50,22 @@ func testDB(dbName string) *gorm.DB {
 		panic(err)
 	}
 	return db
+}
+
+func testCountHandler(run *int64) TaskHandler {
+	return func(ctx context.Context, arg interface{}) (err error) {
+		atomic.AddInt64(run, 1)
+		return nil
+	}
+}
+
+func testWrappedHandler(fs ...TaskHandler) TaskHandler {
+	return func(ctx context.Context, arg interface{}) (err error) {
+		for _, f := range fs {
+			if err := f(ctx, arg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }

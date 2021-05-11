@@ -43,12 +43,12 @@ func checkAbnormalHandler(tm *TaskManager) TaskHandler {
 		abnormalRunning, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.DB, req.StorageTimeout,
 			req.RunningTimeout, TaskStatusRunning)
 		if err != nil {
-			return fmt.Errorf("check abnormal running failed")
+			return fmt.Errorf("check abnormal running failed, err[%w]", err)
 		}
 		abnormalInitilized, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.DB, req.StorageTimeout,
 			req.InitializedTimeout, TaskStatusInitialized)
 		if err != nil {
-			return fmt.Errorf("check abnormal running failed")
+			return fmt.Errorf("check abnormal running failed, err[%w]", err)
 		}
 
 		builtinKeys := tm.tr.GetBuiltInKeys()

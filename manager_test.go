@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,34 +84,16 @@ func (t *testGinCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error
 }
 
 func TestTaskManager_Run(t *testing.T) {
-	countHandler := func(run *int64) TaskHandler {
-		return func(ctx context.Context, arg interface{}) (err error) {
-			atomic.AddInt64(run, 1)
-			return nil
-		}
-	}
-	wrappedHandler := func(fs ...TaskHandler) TaskHandler {
-		return func(ctx context.Context, arg interface{}) (err error) {
-			for _, f := range fs {
-				if err := f(ctx, arg); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}
 	convey.Convey("TestTaskManager_Run", t, func() {
 		convey.Convey("normal", func() {
 			m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks")
 			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			m.Start()
-			err1 := m.Run(context.TODO(), "t1", nil)
-			err2 := m.Run(context.TODO(), "t1", nil)
+			err := m.Run(context.TODO(), "t1", nil)
 			m.Stop(true)
-			convey.So(err1, convey.ShouldBeNil)
-			convey.So(err2, convey.ShouldBeNil)
-			convey.So(t1Run, convey.ShouldEqual, 2)
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(t1Run, convey.ShouldEqual, 1)
 			task, err := m.tdal.Get(m.tc.DB, 10001)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldNotBeNil)
@@ -124,11 +105,11 @@ func TestTaskManager_Run(t *testing.T) {
 			convey.Convey("with CtxMarshaler", func() {
 				var t1Run int64
 				m.Register("t1", TaskDefinition{
-					Handler: wrappedHandler(func(ctx context.Context, arg interface{}) (err error) {
+					Handler: testWrappedHandler(func(ctx context.Context, arg interface{}) (err error) {
 						_ = ctx.(*gin.Context)
 						_ = ctx.Value("request_id").(string)
 						return nil
-					}, countHandler(&t1Run)),
+					}, testCountHandler(&t1Run)),
 					CtxMarshaler: &testGinCtxMarshaler{},
 				})
 				m.Start()
@@ -141,7 +122,7 @@ func TestTaskManager_Run(t *testing.T) {
 			convey.Convey("with RetryTimes", func() {
 				var t1Run int64
 				m.Register("t1", TaskDefinition{
-					Handler: wrappedHandler(countHandler(&t1Run), func(ctx context.Context, arg interface{}) (err error) {
+					Handler: testWrappedHandler(testCountHandler(&t1Run), func(ctx context.Context, arg interface{}) (err error) {
 						return ErrUnexpected
 					}),
 					RetryTimes: 3,
@@ -157,8 +138,8 @@ func TestTaskManager_Run(t *testing.T) {
 				var t1Run int64
 				var timeSlice []time.Time
 				m.Register("t1", TaskDefinition{
-					Handler: wrappedHandler(
-						countHandler(&t1Run),
+					Handler: testWrappedHandler(
+						testCountHandler(&t1Run),
 						func(ctx context.Context, arg interface{}) (err error) {
 							timeSlice = append(timeSlice, time.Now())
 							return nil
@@ -183,7 +164,7 @@ func TestTaskManager_Run(t *testing.T) {
 
 			convey.Convey("with CleanSucceeded", func() {
 				var t1Run int64
-				m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run), CleanSucceeded: true})
+				m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run), CleanSucceeded: true})
 				m.Start()
 				err := m.Run(context.TODO(), "t1", nil)
 				m.Stop(true)
@@ -196,7 +177,7 @@ func TestTaskManager_Run(t *testing.T) {
 
 			convey.Convey("with InitTimeoutSensitive", func() {
 				var t1Run int64
-				m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run), InitTimeoutSensitive: true})
+				m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run), InitTimeoutSensitive: true})
 				err1 := m.tdal.Create(m.tc.DB, &Task{
 					ID:         10001,
 					TaskKey:    "t1",
@@ -233,7 +214,7 @@ func TestTaskManager_Run(t *testing.T) {
 		convey.Convey("ctx cancelled", func() {
 			m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks")
 			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			m.Start()
 			m.Stop(false)
 			err := m.Run(context.TODO(), "t1", nil)
@@ -248,7 +229,7 @@ func TestTaskManager_Run(t *testing.T) {
 		convey.Convey("dry run", func() {
 			m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks", WithDryRun(true))
 			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			err := m.Run(context.TODO(), "t1", nil)
 			convey.So(err, convey.ShouldBeNil)
 			time.Sleep(time.Second)
@@ -258,7 +239,7 @@ func TestTaskManager_Run(t *testing.T) {
 		convey.Convey("full pool", func() {
 			m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks", WithPoolSize(5))
 			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			m.Start()
 			var errSlice []error
 			for i := 0; i < 10; i++ {
@@ -282,14 +263,14 @@ func TestTaskManager_Run(t *testing.T) {
 			defaultTable := "tasks"
 			m := NewTaskManager(defaultDB, defaultTable)
 			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			m.Start()
 			m.Stop(true)
 			err := m.Run(context.TODO(), "t1", nil)
 			convey.So(err, convey.ShouldBeNil)
 
 			m2 := NewTaskManager(defaultDB, defaultTable)
-			m2.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
+			m2.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 			m2.Start()
 			time.Sleep(time.Second)
 			m.Stop(true)
@@ -298,19 +279,38 @@ func TestTaskManager_Run(t *testing.T) {
 
 		convey.Convey("task failed", func() {
 			m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks")
-			var t1Run int64
-			m.Register("t1", TaskDefinition{Handler: wrappedHandler(countHandler(&t1Run), func(ctx context.Context, arg interface{}) (err error) {
-				return ErrUnexpected
-			})})
-			m.Start()
-			err := m.Run(context.TODO(), "t1", nil)
-			m.Stop(true)
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(t1Run, convey.ShouldEqual, 1)
-			task, err := m.tdal.Get(m.tc.DB, 10001)
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(task, convey.ShouldNotBeNil)
-			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusFailed)
+			convey.Convey("task return error", func() {
+				var t1Run int64
+				m.Register("t1", TaskDefinition{Handler: testWrappedHandler(testCountHandler(&t1Run), func(ctx context.Context, arg interface{}) (err error) {
+					return ErrUnexpected
+				})})
+				m.Start()
+				err := m.Run(context.TODO(), "t1", nil)
+				m.Stop(true)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 1)
+				task, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task, convey.ShouldNotBeNil)
+				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusFailed)
+			})
+
+			convey.Convey("task panic inside", func() {
+				var t1Run int64
+				m.Register("t1", TaskDefinition{Handler: testWrappedHandler(testCountHandler(&t1Run), func(ctx context.Context, arg interface{}) (err error) {
+					panic("panic inside task handler")
+					return nil
+				})})
+				m.Start()
+				err := m.Run(context.TODO(), "t1", nil)
+				m.Stop(true)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 1)
+				task, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task, convey.ShouldNotBeNil)
+				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusFailed)
+			})
 		})
 
 		convey.Convey("error", func() {
@@ -324,37 +324,107 @@ func TestTaskManager_Run(t *testing.T) {
 }
 
 func TestTaskManager_RunWithTx(t *testing.T) {
-	countHandler := func(run *int64) TaskHandler {
-		return func(ctx context.Context, arg interface{}) (err error) {
-			atomic.AddInt64(run, 1)
-			return nil
-		}
-	}
 	convey.Convey("TestTaskManager_RunWithTx", t, func() {
-		convey.Convey("normal", func() {
-			m := NewTaskManager(testDB("TestTaskManager_RunWithTx"), "tasks")
-			var t1Run, t2Run int64
-			m.Register("t1", TaskDefinition{Handler: countHandler(&t1Run)})
-			m.Register("t2", TaskDefinition{Handler: countHandler(&t2Run)})
-			m.Start()
+		m := NewTaskManager(testDB("TestTaskManager_RunWithTx"), "tasks", WithScanInterval(time.Second))
+		var t1Run, t2Run int64
+		m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
+		m.Register("t2", TaskDefinition{Handler: testCountHandler(&t2Run)})
 
-			err := m.Transaction(func(tx *gorm.DB) error {
-				err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-				if err1 != nil {
-					return err1
-				}
-				err2 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-				if err2 != nil {
-					return err2
-				}
-				return nil
+		convey.Convey("builtin transaction", func() {
+			convey.Convey("transaction succeeded", func() {
+				m.Start()
+				err := m.Transaction(func(tx *gorm.DB) error {
+					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
+					if err1 != nil {
+						return err1
+					}
+					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
+					if err2 != nil {
+						return err2
+					}
+					return nil
+				})
+				m.Stop(true)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 1)
+				convey.So(t2Run, convey.ShouldEqual, 1)
 			})
-			m.Stop(true)
 
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(t1Run, convey.ShouldEqual, 2)
+			convey.Convey("transaction failed", func() {
+				m.Start()
+				err := m.Transaction(func(tx *gorm.DB) error {
+					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
+					if err1 != nil {
+						return err1
+					}
+					return ErrUnexpected
+					// cannot reach here
+					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
+					if err2 != nil {
+						return err2
+					}
+					return nil
+				})
+				m.Stop(true)
+				convey.So(err, convey.ShouldNotBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 0)
+				convey.So(t2Run, convey.ShouldEqual, 0)
+				task1, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task1, convey.ShouldBeNil)
+				task2, err := m.tdal.Get(m.tc.DB, 10002)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task2, convey.ShouldBeNil)
+			})
 		})
 
+		convey.Convey("not builtin transaction", func() {
+			convey.Convey("transaction succeeded", func() {
+				m.Start()
+				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
+					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
+					if err1 != nil {
+						return err1
+					}
+					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
+					if err2 != nil {
+						return err2
+					}
+					return nil
+				})
+				time.Sleep(time.Second)
+				m.Stop(true)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 1)
+				convey.So(t2Run, convey.ShouldEqual, 1)
+			})
+			convey.Convey("transaction failed", func() {
+				m.Start()
+				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
+					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
+					if err1 != nil {
+						return err1
+					}
+					return ErrUnexpected
+					// cannot reach here
+					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
+					if err2 != nil {
+						return err2
+					}
+					return nil
+				})
+				m.Stop(true)
+				convey.So(err, convey.ShouldNotBeNil)
+				convey.So(t1Run, convey.ShouldEqual, 0)
+				convey.So(t2Run, convey.ShouldEqual, 0)
+				task1, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task1, convey.ShouldBeNil)
+				task2, err := m.tdal.Get(m.tc.DB, 10002)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task2, convey.ShouldBeNil)
+			})
+		})
 	})
 }
 
@@ -373,14 +443,118 @@ func TestTaskManager_Transaction(t *testing.T) {
 	})
 }
 
-func TestTaskManager_ForceRerunTask(t *testing.T) {
+func TestTaskManager_Stop(t *testing.T) {
+	convey.Convey("TestTaskManager_Stop", t, func() {
+		m := NewTaskManager(testDB("TestTaskManager_Stop"), "tasks", WithWaitTimeout(time.Millisecond))
+		convey.Convey("wait", func() {
+			m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) { return nil }})
+			m.Start()
+			err := m.Run(context.TODO(), "t1", nil)
+			m.Stop(true)
+			convey.So(err, convey.ShouldBeNil)
+			task, err := m.tdal.Get(m.tc.DB, 10001)
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(task, convey.ShouldNotBeNil)
+			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
+		})
+
+		convey.Convey("not wait", func() {
+			m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) {
+				time.Sleep(time.Second * 6)
+				return nil
+			}})
+			m.Start()
+			err := m.Run(context.TODO(), "t1", nil)
+			m.Stop(false)
+			convey.So(err, convey.ShouldBeNil)
+			task, err := m.tdal.Get(m.tc.DB, 10001)
+			convey.So(err, convey.ShouldBeNil)
+			convey.So(task, convey.ShouldNotBeNil)
+			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
+		})
+	})
 }
 
 func TestTaskManager_ForceRerunTasks(t *testing.T) {
+	m := NewTaskManager(testDB("TestTaskManager_ForceRerunTasks"), "tasks")
+	var t1Run int64
+	m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
+	convey.Convey("TestTaskManager_ForceRerunTasks", t, func() {
+		_ = m.tdal.Create(m.tc.DB, &Task{
+			ID:         10001,
+			TaskKey:    "t1",
+			TaskStatus: TaskStatusFailed,
+			Context:    nil,
+			Argument:   nil,
+			Extra:      TaskExtra{},
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		})
+		count, err := m.ForceRerunTasks([]uint64{10001}, TaskStatusFailed)
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(count, convey.ShouldEqual, 1)
+	})
 }
 
 func TestTaskManager_QueryUnsuccessfulTasks(t *testing.T) {
+	m := NewTaskManager(testDB("TestTaskManager_QueryUnsuccessfulTasks"), "tasks")
+	var t1Run int64
+	m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
+	convey.Convey("TestTaskManager_QueryUnsuccessfulTasks", t, func() {
+		_ = m.tdal.Create(m.tc.DB, &Task{
+			ID:         10001,
+			TaskKey:    "t1",
+			TaskStatus: TaskStatusFailed,
+			Context:    nil,
+			Argument:   nil,
+			Extra:      TaskExtra{},
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		})
+		tasks, err := m.QueryUnsuccessfulTasks(10, 0)
+		convey.So(err, convey.ShouldBeNil)
+		convey.So(tasks, convey.ShouldHaveLength, 1)
+	})
 }
 
-func TestTaskManager_Stop(t *testing.T) {
+func TestTaskManager_Others(t *testing.T) {
+	convey.Convey("TestTaskManager_Others", t, func() {
+		m := NewTaskManager(testDB("TestTaskManager_Others"), "tasks")
+		convey.Convey("nested tasks", func() {
+			var innerRun, outterRun int64
+			m.Register("inner", TaskDefinition{Handler: testCountHandler(&innerRun)})
+			m.Register("outter", TaskDefinition{Handler: testWrappedHandler(testCountHandler(&outterRun), func(ctx context.Context, arg interface{}) (err error) {
+				return m.Run(context.TODO(), "inner", nil)
+			})})
+
+			m.Start()
+			err := m.Run(context.TODO(), "outter", nil)
+			convey.So(err, convey.ShouldBeNil)
+			time.Sleep(time.Second)
+			m.Stop(true)
+			convey.So(outterRun, convey.ShouldEqual, 1)
+			convey.So(innerRun, convey.ShouldEqual, 1)
+		})
+
+		convey.Convey("multiple tasks", func() {
+			var t1Run, t2Run int64
+			m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
+			m.Register("t2", TaskDefinition{Handler: testCountHandler(&t2Run)})
+
+			m.Start()
+			err := m.Transaction(func(tx *gorm.DB) error {
+				if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
+					return err
+				}
+				if err := m.RunWithTx(tx, context.TODO(), "t2", nil); err != nil {
+					return err
+				}
+				return nil
+			})
+			convey.So(err, convey.ShouldBeNil)
+			m.Stop(true)
+			convey.So(t1Run, convey.ShouldEqual, 1)
+			convey.So(t2Run, convey.ShouldEqual, 1)
+		})
+	})
 }

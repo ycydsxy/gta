@@ -21,7 +21,6 @@ import (
 
 const (
 	testNormalTask TaskKey = "test_normal_task"
-	testPanicTask  TaskKey = "test_panic_task"
 
 	testCtxUserIDKey       = "test_userID"
 	testCtxTenantIDKey     = "test_tenantID"
@@ -40,17 +39,6 @@ func init() {
 		CleanSucceeded: true,
 	})
 
-	Register(testPanicTask, TaskDefinition{
-		Handler: func(ctx context.Context, arg interface{}) (err error) {
-			panic(arg)
-		},
-	})
-}
-
-func TestRegister(t *testing.T) {
-	convey.Convey("TestRegister", t, func() {
-		convey.So(func() { Register("", TaskDefinition{}) }, convey.ShouldPanic)
-	})
 }
 
 func TestMainProcess(t *testing.T) {
@@ -70,148 +58,121 @@ func TestMainProcess(t *testing.T) {
 		StorageTimeout:     time.Second * 30,
 		PoolSize:           5,
 	}))
+	defer Stop(false)
 
 	// biz process
 	convey.Convey("TestMainProcess", t, func() {
-		convey.Convey("test error", func() {
-			convey.Convey("argument mismatch", func() {
-				taskCtx := mockTaskContext("", "", "", "")
-				var mismatchArgument = "mismatch"
-				err := Run(taskCtx, testNormalTask, &mismatchArgument)
-				convey.So(err, convey.ShouldNotBeNil)
-			})
-
-			convey.Convey("handler panic", func() {
-				taskCtx := mockTaskContext("", "", "", "")
-				err := Run(taskCtx, testPanicTask, testTaskArg{A: 10000, B: 10000})
-				convey.So(err, convey.ShouldBeNil)
-			})
+		convey.Convey("no transaction funcs", func() {
+			for i := 5; i < 10; i++ {
+				taskCtx := mockTaskContext(fmt.Sprintf("req_1000000%d", i), strconv.Itoa(i+10000),
+					strconv.Itoa(i-10000), strconv.Itoa(2*i))
+				if err := Run(taskCtx, testNormalTask, &testTaskArg{A: i, B: 2 * i}); err != nil {
+					convey.So(err, convey.ShouldBeNil)
+				}
+			}
 		})
 
-		convey.Convey("test normal", func() {
-			convey.Convey("no transaction funcs", func() {
-				for i := 5; i < 10; i++ {
-					taskCtx := mockTaskContext(fmt.Sprintf("req_1000000%d", i), strconv.Itoa(i+10000),
-						strconv.Itoa(i-10000), strconv.Itoa(2*i))
-					if err := Run(taskCtx, testNormalTask, &testTaskArg{A: i, B: 2 * i}); err != nil {
-						convey.So(err, convey.ShouldBeNil)
-					}
+		convey.Convey("transaction funcs", func() {
+			fa := func(tx *gorm.DB) error {
+				fmt.Println("fa function succeeded")
+				return nil
+			}
+
+			fb := func(tx *gorm.DB) error {
+				fmt.Println("fb function failed")
+				return errors.New("fb failed")
+			}
+
+			// single no-builtin transaction, tf succeeded, hander successded
+			taskCtx := mockTaskContext("req_1000000fa_t", "fa_t", "fa_u", "fa_c")
+			err = db.Transaction(func(tx *gorm.DB) error {
+				if err := fa(tx); err != nil {
+					return err
 				}
+				if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 0, B: 0}); err != nil {
+					return err
+				}
+				return nil
 			})
+			convey.So(err, convey.ShouldBeNil)
 
-			convey.Convey("transaction funcs", func() {
-				fa := func(tx *gorm.DB) error {
-					fmt.Println("fa function succeeded")
-					return nil
+			// single transaction funcs(tf), tf succeeded, hander successded
+			taskCtx = mockTaskContext("req_1000000fa_t", "fa_t", "fa_u", "fa_c")
+			err = Transaction(func(tx *gorm.DB) error {
+				if err := fa(tx); err != nil {
+					return err
 				}
-
-				fb := func(tx *gorm.DB) error {
-					fmt.Println("fb function failed")
-					return errors.New("fb failed")
+				if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 0, B: 0}); err != nil {
+					return err
 				}
-
-				// no task
-				err := Transaction(func(tx *gorm.DB) error {
-					return fa(tx)
-				})
-				convey.So(err, convey.ShouldBeNil)
-
-				err = Transaction(func(tx *gorm.DB) error {
-					return errors.New("transaction error")
-				})
-				convey.So(err, convey.ShouldNotBeNil)
-
-				// single no-builtin transaction, tf succeeded, hander successded
-				taskCtx := mockTaskContext("req_1000000fa_t", "fa_t", "fa_u", "fa_c")
-				err = db.Transaction(func(tx *gorm.DB) error {
-					if err := fa(tx); err != nil {
-						return err
-					}
-					if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 0, B: 0}); err != nil {
-						return err
-					}
-					return nil
-				})
-				convey.So(err, convey.ShouldBeNil)
-
-				// single transaction funcs(tf), tf succeeded, hander successded
-				taskCtx = mockTaskContext("req_1000000fa_t", "fa_t", "fa_u", "fa_c")
-				err = Transaction(func(tx *gorm.DB) error {
-					if err := fa(tx); err != nil {
-						return err
-					}
-					if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 0, B: 0}); err != nil {
-						return err
-					}
-					return nil
-				})
-				convey.So(err, convey.ShouldBeNil)
-
-				// multiple tf, tf succeeded, hander failed
-				taskCtx = mockTaskContext("req_1000000faa_t", "faa_t", "faa_u", "faa_c")
-				err = Transaction(func(tx *gorm.DB) error {
-					if err := fa(tx); err != nil {
-						return err
-					}
-					if err := fa(tx); err != nil {
-						return err
-					}
-					if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 1, B: 2}); err != nil {
-						return err
-					}
-					return nil
-				})
-				convey.So(err, convey.ShouldBeNil)
-
-				// signle tf, tf failed
-				taskCtx = mockTaskContext("req_1000000fb_t", "fb_t", "fb_u", "fb_c")
-				err = Transaction(func(tx *gorm.DB) error {
-					if err := fb(tx); err != nil {
-						return err
-					}
-					if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 2, B: 4}); err != nil {
-						return err
-					}
-					return nil
-				})
-				convey.So(err, convey.ShouldNotBeNil)
-
-				// multiple tf, tf failed
-				taskCtx = mockTaskContext("req_1000000fab_t", "fab_t", "fab_u", "fab_c")
-				err = Transaction(func(tx *gorm.DB) error {
-					if err := fa(tx); err != nil {
-						return err
-					}
-					if err := fb(tx); err != nil {
-						return err
-					}
-					if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 3, B: 6}); err != nil {
-						return err
-					}
-					return nil
-				})
-				convey.So(err, convey.ShouldNotBeNil)
+				return nil
 			})
+			convey.So(err, convey.ShouldBeNil)
 
-			convey.Convey("wait funcs", func() {
-				taskCtx := mockTaskContext("req_1000000wait1", "wait1", "wait1", "wait1")
-				if err := Run(taskCtx, testNormalTask, &testTaskArg{A: 20, B: 42}); err != nil {
-					convey.So(err, convey.ShouldBeNil)
+			// multiple tf, tf succeeded, hander failed
+			taskCtx = mockTaskContext("req_1000000faa_t", "faa_t", "faa_u", "faa_c")
+			err = Transaction(func(tx *gorm.DB) error {
+				if err := fa(tx); err != nil {
+					return err
 				}
-
-				taskCtx = mockTaskContext("req_1000000wait2", "wait2", "wait2", "wait2")
-				if err := Run(taskCtx, testNormalTask, &testTaskArg{A: 20, B: 60}); err != nil {
-					convey.So(err, convey.ShouldBeNil)
+				if err := fa(tx); err != nil {
+					return err
 				}
+				if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 1, B: 2}); err != nil {
+					return err
+				}
+				return nil
 			})
+			convey.So(err, convey.ShouldBeNil)
+
+			// signle tf, tf failed
+			taskCtx = mockTaskContext("req_1000000fb_t", "fb_t", "fb_u", "fb_c")
+			err = Transaction(func(tx *gorm.DB) error {
+				if err := fb(tx); err != nil {
+					return err
+				}
+				if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 2, B: 4}); err != nil {
+					return err
+				}
+				return nil
+			})
+			convey.So(err, convey.ShouldNotBeNil)
+
+			// multiple tf, tf failed
+			taskCtx = mockTaskContext("req_1000000fab_t", "fab_t", "fab_u", "fab_c")
+			err = Transaction(func(tx *gorm.DB) error {
+				if err := fa(tx); err != nil {
+					return err
+				}
+				if err := fb(tx); err != nil {
+					return err
+				}
+				if err := RunWithTx(tx, taskCtx, testNormalTask, &testTaskArg{A: 3, B: 6}); err != nil {
+					return err
+				}
+				return nil
+			})
+			convey.So(err, convey.ShouldNotBeNil)
+		})
+
+		convey.Convey("wait funcs", func() {
+			taskCtx := mockTaskContext("req_1000000wait1", "wait1", "wait1", "wait1")
+			if err := Run(taskCtx, testNormalTask, &testTaskArg{A: 20, B: 42}); err != nil {
+				convey.So(err, convey.ShouldBeNil)
+			}
+
+			taskCtx = mockTaskContext("req_1000000wait2", "wait2", "wait2", "wait2")
+			if err := Run(taskCtx, testNormalTask, &testTaskArg{A: 20, B: 60}); err != nil {
+				convey.So(err, convey.ShouldBeNil)
+			}
 		})
 	})
 
 	time.Sleep(time.Second * 40)
 
 	go func() {
+		time.Sleep(time.Second)
 		convey.Convey("TestProcessAfterClean", t, func() {
-			time.Sleep(time.Second)
 			convey.Convey("normal", func() {
 				taskCtx := mockTaskContext("ctx_done1", "ctx_done1", "ctx_done1", "ctx_done1")
 				err := Run(taskCtx, testNormalTask, &testTaskArg{A: 2, B: 4})
@@ -233,27 +194,6 @@ func TestMainProcess(t *testing.T) {
 		})
 	}()
 
-	Stop(false)
-
-	convey.Convey("TestDevops", t, func() {
-		convey.Convey("TestQueryUnsuccessfulTasks", func() {
-			res, err := QueryUnsuccessfulTasks()
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(res, convey.ShouldNotBeEmpty)
-		})
-
-		convey.Convey("TestForceRerunTask", func() {
-			convey.Convey("normal", func() {
-				err := ForceRerunTask(10003, TaskStatusFailed)
-				convey.So(err, convey.ShouldBeNil)
-			})
-
-			convey.Convey("error", func() {
-				err := ForceRerunTask(0, TaskStatusFailed)
-				convey.So(err, convey.ShouldNotBeNil)
-			})
-		})
-	})
 }
 
 func loggerFactory(ctx context.Context) Logger {
@@ -284,17 +224,13 @@ func mockTaskContext(requestID string, tenantID string, userID string, c string)
 
 func normalTestTaskFunc(ctx context.Context, req *testTaskArg) error {
 	logger := loggerFactory(ctx)
-	logger.Infof("[normalTestTaskFunc] inside handler, start, req[%+v], ctx_param[%v]", req,
-		ctx.Value(testCtxTaskContextCKey))
-
+	logger.Infof("[normalTestTaskFunc] inside handler, start, req[%+v], ctx_param[%v]", req, ctx.Value(testCtxTaskContextCKey))
 	// do business processes
 	time.Sleep(time.Second * time.Duration(req.B))
 	if req.A%5 == 1 { // mock error
 		return errors.New("test error")
 	}
-
-	logger.Infof("[normalTestTaskFunc] inside handler, end, req[%+v], ctx_param[%v]", req,
-		ctx.Value(testCtxTaskContextCKey))
+	logger.Infof("[normalTestTaskFunc] inside handler, end, req[%+v], ctx_param[%v]", req, ctx.Value(testCtxTaskContextCKey))
 	return nil
 }
 

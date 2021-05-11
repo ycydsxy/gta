@@ -130,25 +130,14 @@ func (s *TaskManager) Wait() {
 	}
 }
 
-// ForceRerunTask changes the specific task to 'initialized'.
-func (s *TaskManager) ForceRerunTask(taskID uint64, status TaskStatus) error {
-	rows, err := s.ForceRerunTasks([]uint64{taskID}, status)
-	if err != nil {
-		return err
-	} else if rows != 1 {
-		return ErrZeroRowsAffected
-	}
-	return nil
-}
-
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
 	return s.tdal.UpdateStatusByIDs(s.tc.DB, taskIDs, status, TaskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
-func (s *TaskManager) QueryUnsuccessfulTasks() ([]Task, error) {
-	return s.tdal.GetSliceExcludeSucceeded(s.tc.DB, s.tr.GetBuiltInKeys())
+func (s *TaskManager) QueryUnsuccessfulTasks(limit, offset int) ([]Task, error) {
+	return s.tdal.GetSliceExcludeSucceeded(s.tc.DB, s.tr.GetBuiltInKeys(), limit, offset)
 }
 
 func (s *TaskManager) registerBuiltinTasks() {

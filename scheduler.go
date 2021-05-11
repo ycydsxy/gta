@@ -40,10 +40,7 @@ func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
 		return err
 	}
 
-	toScheduleTasks, ok := db.Get(transactionKey)
-	if !ok {
-		return ErrUnexpected
-	}
+	toScheduleTasks, _ := db.Get(transactionKey)
 	toScheduleTasks.(*sync.Map).Range(func(key, value interface{}) bool {
 		s.GoScheduleTask(value.(*Task))
 		return true
@@ -78,9 +75,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 					if err := s.createRunningTask(tx, task); err != nil {
 						return err
 					}
-					if _, loaded := toScheduleTasks.(*sync.Map).LoadOrStore(task.ID, task); loaded {
-						return ErrUnexpected
-					}
+					toScheduleTasks.(*sync.Map).Store(task.ID, task)
 				} else {
 					if err := s.createInitializedTask(tx, task); err != nil {
 						return err
@@ -91,9 +86,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 				task.ID = rand.Uint64()
 				task.TaskStatus = TaskStatusRunning
 				// task will be scheduled after the transaction succeeded
-				if _, loaded := toScheduleTasks.(*sync.Map).LoadOrStore(task.ID, task); loaded {
-					return ErrUnexpected
-				}
+				toScheduleTasks.(*sync.Map).Store(task.ID, task)
 			}
 		} else {
 			// not builtin transaction, create initialized task

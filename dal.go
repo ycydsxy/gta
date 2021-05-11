@@ -14,7 +14,7 @@ type taskDAL interface {
 	GetForUpdate(tx *gorm.DB, id uint64) (*Task, error)
 	GetInitialized(tx *gorm.DB, sensitiveKeys []TaskKey, offset time.Duration, insensitiveKeys []TaskKey) (*Task, error)
 	GetSliceByOffsetsAndStatus(tx *gorm.DB, startOffset, endOffset time.Duration, status TaskStatus) ([]Task, error)
-	GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey) ([]Task, error)
+	GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey, limit, offset int) ([]Task, error)
 
 	Update(tx *gorm.DB, task *Task) (int64, error)
 	UpdateStatusByIDs(tx *gorm.DB, taskIDs []uint64, ori TaskStatus, new TaskStatus) (int64, error)
@@ -90,10 +90,13 @@ func (s *taskDALImp) GetSliceByOffsetsAndStatus(tx *gorm.DB, startOffset, endOff
 	return res, err
 }
 
-func (s *taskDALImp) GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey) ([]Task, error) {
+func (s *taskDALImp) GetSliceExcludeSucceeded(tx *gorm.DB, excludeKeys []TaskKey, limit, offset int) ([]Task, error) {
 	var res []Task
-	err := s.tabledDB(tx).Where("task_status <> ? AND task_key NOT IN (?)", TaskStatusSucceeded, excludeKeys).
-		Find(&res).Error
+	db := s.tabledDB(tx).Where("task_status <> ?", TaskStatusSucceeded)
+	if len(excludeKeys) > 0 {
+		db = db.Where("task_key NOT IN (?)", excludeKeys)
+	}
+	err := db.Limit(limit).Offset(offset).Find(&res).Error
 	return res, err
 }
 
@@ -110,8 +113,11 @@ func (s *taskDALImp) UpdateStatusByIDs(tx *gorm.DB, ids []uint64, oriStatus Task
 func (s *taskDALImp) DeleteSucceededByOffset(tx *gorm.DB, offset time.Duration, excludeKeys []TaskKey) (int64,
 	error) {
 	var rule Task
-	db := s.tabledDB(tx).Where("task_status = ? AND updated_at < ? AND task_key NOT IN (?)",
-		TaskStatusSucceeded, time.Now().Add(-offset), excludeKeys).Delete(&rule)
+	db := s.tabledDB(tx).Where("task_status = ? AND updated_at < ?", TaskStatusSucceeded, time.Now().Add(-offset))
+	if len(excludeKeys) > 0 {
+		db = db.Where("task_key NOT IN (?)", excludeKeys)
+	}
+	db.Delete(&rule)
 	return db.RowsAffected, db.Error
 }
 
