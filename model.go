@@ -43,8 +43,5 @@ func (s TaskExtra) Value() (driver.Value, error) {
 
 // Scan implements Scanner.
 func (s *TaskExtra) Scan(v interface{}) error {
-	if v == nil {
-		return nil
-	}
 	return json.Unmarshal(v.([]byte), s)
 }

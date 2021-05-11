@@ -71,7 +71,7 @@ func checkAbnormalHandler(tm *TaskManager) TaskHandler {
 			abnormalTasks = append(abnormalTasks, t)
 		}
 
-		tc.CheckCallback(abnormalTasks)
+		tc.CheckCallback(tc.logger(), abnormalTasks)
 		return nil
 	}
 }

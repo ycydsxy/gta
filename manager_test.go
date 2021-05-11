@@ -3,7 +3,6 @@ package gta
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http/httptest"
 	"reflect"
@@ -323,6 +322,18 @@ func TestTaskManager_Run(t *testing.T) {
 				err := m.Run(context.TODO(), "not existed", nil)
 				convey.So(err, convey.ShouldNotBeNil)
 			})
+
+			convey.Convey("argument mismatch", func() {
+				m := NewTaskManager(testDB("TestTaskManager_Run"), "tasks", WithPoolSize(1))
+				m.Register("t1", TaskDefinition{
+					Handler: func(ctx context.Context, arg interface{}) (err error) {
+						return nil
+					},
+					ArgType: reflect.TypeOf(""),
+				})
+				err := m.Run(context.TODO(), "t1", 0)
+				convey.So(err, convey.ShouldNotBeNil)
+			})
 		})
 	})
 }
@@ -588,6 +599,8 @@ func TestTaskManager_Race(t *testing.T) {
 				WithRunningTimeout(time.Second*8),
 				WithStorageTimeout(time.Second*30),
 				WithPoolSize(5),
+				WithCtxMarshaler(&defaultCtxMarshaler{}),
+				WithCheckCallback(defaultCheckCallback),
 			)
 			m.Register("t", TaskDefinition{
 				Handler: func(ctx context.Context, arg interface{}) (err error) {
@@ -601,13 +614,10 @@ func TestTaskManager_Race(t *testing.T) {
 			return m
 		}
 
-		var (
-			managers []*TaskManager
-		)
-		for i := 0; i < 10; i++ {
-			manager := tmFactory(fmt.Sprintf("m%d", i))
-			managers = append(managers, manager)
-			manager.Start()
+		managers := make([]*TaskManager, 10)
+		for i := range managers {
+			managers[i] = tmFactory(fmt.Sprintf("m%d", i))
+			managers[i].Start()
 		}
 		m0 := managers[0]
 
@@ -643,7 +653,7 @@ func TestTaskManager_Race(t *testing.T) {
 		}
 
 		// long task
-		err := m0.Run(mockTaskContext("request_long_task", "user_id_0"), "t", &testTaskArg{A: 21, B: 100})
+		err := m0.Run(mockTaskContext("request_long_task", "user_id_0"), "t", &testTaskArg{A: 22, B: 100})
 		convey.So(err, convey.ShouldBeNil)
 
 		// sleep and stop
@@ -658,6 +668,19 @@ func TestTaskManager_Race(t *testing.T) {
 			err := m0.Run(ctx, "t", &testTaskArg{})
 			convey.So(err, convey.ShouldBeNil)
 		}
+
+		// confirm database status
+		tasks, _ := m0.QueryUnsuccessfulTasks(100, 0)
+		var initializedCount, failedCount int
+		for _, t := range tasks {
+			if t.TaskStatus == TaskStatusInitialized {
+				initializedCount++
+			} else if t.TaskStatus == TaskStatusFailed {
+				failedCount++
+			}
+		}
+		convey.So(failedCount, convey.ShouldEqual, 3)
+		convey.So(initializedCount, convey.ShouldEqual, 6)
 	})
 }
 
@@ -668,9 +691,9 @@ type testTaskArg struct {
 
 func testTaskHandler(ctx context.Context, req *testTaskArg) error {
 	time.Sleep(time.Second * time.Duration(req.B))
-	if req.A%5 == 1 {
-		// mock error
-		return errors.New("test error")
+	if req.A%10 == 1 {
+		// mock error when A is ended with `1`
+		return fmt.Errorf("error bacause req.A is %d", req.A)
 	}
 	return nil
 }

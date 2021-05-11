@@ -29,22 +29,20 @@ func (s *defaultCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error
 	return context.Background(), nil
 }
 
-func defaultContext() context.Context {
+func defaultContextFactory() context.Context {
 	return context.Background()
 }
 
-func defaultLoggerFactory() func(ctx context.Context) Logger {
-	return func(ctx context.Context) Logger { return logrus.NewEntry(logrus.New()) }
+func defaultLoggerFactory(ctx context.Context) Logger {
+	return logrus.NewEntry(logrus.New())
 }
 
-func defaultCheckCallback(logger Logger) func(abnormalTasks []Task) {
-	return func(abnormalTasks []Task) {
-		if len(abnormalTasks) == 0 {
-			return
-		}
-		logger.Errorf("[defaultCheckCallback] abnormal tasks found, total[%v]", len(abnormalTasks))
-		for _, at := range abnormalTasks {
-			logger.Warnf("[defaultCheckCallback] abnormal task found, id[%v], task_key[%v], task_status[%v]", at.ID, at.TaskKey, at.TaskStatus)
-		}
+func defaultCheckCallback(logger Logger, abnormalTasks []Task) {
+	if len(abnormalTasks) == 0 {
+		return
+	}
+	logger.Errorf("[defaultCheckCallback] abnormal tasks found, total[%v]", len(abnormalTasks))
+	for _, at := range abnormalTasks {
+		logger.Warnf("[defaultCheckCallback] abnormal task found, id[%v], task_key[%v], task_status[%v]", at.ID, at.TaskKey, at.TaskStatus)
 	}
 }

@@ -33,7 +33,7 @@ type TaskConfig struct {
 	// optional, context marshaler to store or recover a context
 	CtxMarshaler CtxMarshaler
 	// optional, callback function for abnormal tasks
-	CheckCallback func(abnormalTasks []Task)
+	CheckCallback func(logger Logger, abnormalTasks []Task)
 	// optional, flag for dry run mode
 	DryRun bool
 	// optional, goroutine pool size for scheduling tasks
@@ -54,10 +54,10 @@ func (s *TaskConfig) init() error {
 
 	// default value for optional config
 	if s.Context == nil {
-		s.Context = defaultContext()
+		s.Context = defaultContextFactory()
 	}
 	if s.LoggerFactory == nil {
-		s.LoggerFactory = defaultLoggerFactory()
+		s.LoggerFactory = defaultLoggerFactory
 	}
 	if s.StorageTimeout <= 0 {
 		s.StorageTimeout = defaultStorageTimeout
@@ -81,7 +81,7 @@ func (s *TaskConfig) init() error {
 		s.CtxMarshaler = &defaultCtxMarshaler{}
 	}
 	if s.CheckCallback == nil {
-		s.CheckCallback = defaultCheckCallback(s.logger())
+		s.CheckCallback = defaultCheckCallback
 	}
 	if s.PoolSize <= 0 {
 		s.PoolSize = defaultPoolSize
@@ -205,7 +205,7 @@ func WithCtxMarshaler(m CtxMarshaler) Option {
 }
 
 // WithCheckCallback set the CheckCallback option.
-func WithCheckCallback(f func(abnormalTasks []Task)) Option {
+func WithCheckCallback(f func(logger Logger, abnormalTasks []Task)) Option {
 	return func(c *TaskConfig) { c.CheckCallback = f }
 }
 

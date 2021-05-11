@@ -213,3 +213,9 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 		})
 	})
 }
+
+func Test_taskSchedulerImp_GoScheduleTask(t *testing.T) {
+	convey.Convey("Test_taskSchedulerImp_GoScheduleTask", t, func() {
+		// TODO
+	})
+}
