@@ -45,11 +45,6 @@ func Stop(wait bool) {
 	defaultTaskManager.Stop(wait)
 }
 
-// Wait blocks the current goroutine and waits for a termination signal.
-func Wait() {
-	defaultTaskManager.Wait()
-}
-
 // DefaultManager returns the default task manager.
 func DefaultManager() *TaskManager {
 	return defaultTaskManager
