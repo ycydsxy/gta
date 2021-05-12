@@ -594,7 +594,7 @@ func TestTaskManager_Race(t *testing.T) {
 				WithScanInterval(time.Second),
 				WithInstantScanInterval(time.Millisecond*100),
 				WithInitializedTimeout(time.Second*5),
-				WithRunningTimeout(time.Second*8),
+				WithRunningTimeout(time.Second*4),
 				WithStorageTimeout(time.Second*30),
 				WithPoolSize(5),
 				WithCtxMarshaler(&defaultCtxMarshaler{}),
