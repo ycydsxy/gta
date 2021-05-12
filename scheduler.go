@@ -133,13 +133,17 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 			logger.Infof("[Stop] current running tasks finished")
 			return
 		} else if !wait || (s.config.WaitTimeout > 0 && time.Since(waitStart) > s.config.WaitTimeout) {
-			// change remaining tasks status to initialized
-			rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, taskIDs, TaskStatusRunning, TaskStatusInitialized)
-			if err != nil {
-				logger.Errorf("[Stop] update task status from running to initialized failed, err[%v]", err)
-				return
+			if !s.config.DryRun {
+				// change remaining tasks status to initialized
+				rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, taskIDs, TaskStatusRunning, TaskStatusInitialized)
+				if err != nil {
+					logger.Errorf("[Stop] update task status from running to initialized failed, err[%v]", err)
+					return
+				}
+				logger.Infof("[Stop] change current running tasks to initialized, len[%v], changed len[%v]", len(taskIDs), rowsAffected)
+			} else {
+				logger.Warnf("[Stop] remaining running tasks len[%v] in dry run mode, cannot gracefully exit!", len(taskIDs))
 			}
-			logger.Infof("[Stop] change current running tasks to initialized, len[%v], changed len[%v]", len(taskIDs), rowsAffected)
 			return
 		}
 	}

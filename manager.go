@@ -109,10 +109,10 @@ func (s *TaskManager) Transaction(fc func(tx *gorm.DB) error) (err error) {
 // The wait parameter determines whether to wait for all running tasks to complete.
 func (s *TaskManager) Stop(wait bool) {
 	s.stopOnce.Do(func() {
-		if s.tc.DryRun {
-			return
+		if !s.tc.DryRun {
+			// send global cancel signal
+			s.tc.cancel()
 		}
-		s.tc.cancel() // send global cancel signal
 		s.tsch.Stop(wait)
 	})
 }

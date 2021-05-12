@@ -50,12 +50,7 @@ func Wait() {
 	defaultTaskManager.Wait()
 }
 
-// ForceRerunTasks changes specific tasks to 'initialized'.
-func ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return defaultTaskManager.ForceRerunTasks(taskIDs, status)
-}
-
-// QueryUnsuccessfulTasks checks initialized, running or failed tasks.
-func QueryUnsuccessfulTasks(limit, offset int) ([]Task, error) {
-	return defaultTaskManager.QueryUnsuccessfulTasks(limit, offset)
+// DefaultManager returns the default task manager.
+func DefaultManager() *TaskManager {
+	return defaultTaskManager
 }

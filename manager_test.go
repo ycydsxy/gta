@@ -441,32 +441,49 @@ func TestTaskManager_Transaction(t *testing.T) {
 
 func TestTaskManager_Stop(t *testing.T) {
 	convey.Convey("TestTaskManager_Stop", t, func() {
-		m := NewTaskManager(testDB("TestTaskManager_Stop"), "tasks", WithWaitTimeout(time.Millisecond))
-		convey.Convey("wait", func() {
-			m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) { return nil }})
-			m.Start()
-			err := m.Run(context.TODO(), "t1", nil)
-			m.Stop(true)
-			convey.So(err, convey.ShouldBeNil)
-			task, err := m.tdal.Get(m.tc.DB, 10001)
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(task, convey.ShouldNotBeNil)
-			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
+		convey.Convey("normal", func() {
+			m := NewTaskManager(testDB("TestTaskManager_Stop"), "tasks", WithWaitTimeout(time.Millisecond))
+			convey.Convey("wait", func() {
+				m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) { return nil }})
+				m.Start()
+				err := m.Run(context.TODO(), "t1", nil)
+				m.Stop(true)
+				convey.So(err, convey.ShouldBeNil)
+				task, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task, convey.ShouldNotBeNil)
+				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
+			})
+
+			convey.Convey("not wait", func() {
+				m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) {
+					time.Sleep(time.Second * 6)
+					return nil
+				}})
+				m.Start()
+				err := m.Run(context.TODO(), "t1", nil)
+				m.Stop(false)
+				convey.So(err, convey.ShouldBeNil)
+				task, err := m.tdal.Get(m.tc.DB, 10001)
+				convey.So(err, convey.ShouldBeNil)
+				convey.So(task, convey.ShouldNotBeNil)
+				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
+			})
 		})
 
-		convey.Convey("not wait", func() {
+		convey.Convey("dry run", func() {
+			m := NewTaskManager(testDB("TestTaskManager_Stop"), "tasks", WithWaitTimeout(time.Millisecond), WithDryRun(true))
 			m.Register("t1", TaskDefinition{Handler: func(ctx context.Context, arg interface{}) (err error) {
 				time.Sleep(time.Second * 6)
 				return nil
 			}})
 			m.Start()
 			err := m.Run(context.TODO(), "t1", nil)
-			m.Stop(false)
+			m.Stop(true)
 			convey.So(err, convey.ShouldBeNil)
 			task, err := m.tdal.Get(m.tc.DB, 10001)
 			convey.So(err, convey.ShouldBeNil)
-			convey.So(task, convey.ShouldNotBeNil)
-			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
+			convey.So(task, convey.ShouldBeNil)
 		})
 	})
 }
