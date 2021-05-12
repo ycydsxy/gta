@@ -2,10 +2,7 @@ package gta
 
 import (
 	"context"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
@@ -117,18 +114,17 @@ func (s *TaskManager) Stop(wait bool) {
 	})
 }
 
-// Wait blocks the current goroutine and waits for a termination signal. Stop() will be called after the termination
-// signal is received. Maybe this function is useless, because the main function is always blocked by others, like a
-// http server.
-func (s *TaskManager) Wait() {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
-	select {
-	case <-ch:
-		s.Stop(false)
-		return
-	}
-}
+// // Wait blocks the current goroutine and waits for a termination signal. Stop() will be called after the termination
+// // signal is received. Maybe this function is useless, because the main function is always blocked by others, like a
+// // http server.
+// func (s *TaskManager) Wait() {
+// 	ch := make(chan os.Signal, 1)
+// 	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+// 	select {
+// 	case <-ch:
+// 		s.Stop(false)
+// 	}
+// }
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
