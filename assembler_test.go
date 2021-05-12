@@ -8,13 +8,13 @@ import (
 	"github.com/smartystreets/goconvey/convey"
 )
 
-type errCtxMarshaler struct{}
+type testErrCtxMarshaler struct{}
 
-func (e *errCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
+func (e *testErrCtxMarshaler) MarshalCtx(ctx context.Context) ([]byte, error) {
 	return nil, ErrUnexpected
 }
 
-func (e *errCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
+func (e *testErrCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error) {
 	return nil, ErrUnexpected
 }
 
@@ -50,7 +50,7 @@ func Test_taskAssemblerImp_AssembleTask(t *testing.T) {
 		})
 
 		convey.Convey("ctx cannot marshal", func() {
-			task, err := tass.AssembleTask(context.TODO(), &TaskDefinition{CtxMarshaler: &errCtxMarshaler{}}, "0")
+			task, err := tass.AssembleTask(context.TODO(), &TaskDefinition{CtxMarshaler: &testErrCtxMarshaler{}}, "0")
 			convey.So(err, convey.ShouldNotBeNil)
 			convey.So(task, convey.ShouldBeNil)
 		})
@@ -85,7 +85,7 @@ func Test_taskAssemblerImp_DisassembleTask(t *testing.T) {
 		convey.Convey("unmarshal ctx error", func() {
 			taskDef := &TaskDefinition{ArgType: reflect.TypeOf(0)}
 			task, _ := tass.AssembleTask(context.TODO(), taskDef, 5)
-			taskDef.CtxMarshaler = &errCtxMarshaler{}
+			taskDef.CtxMarshaler = &testErrCtxMarshaler{}
 			ctx, arg, err := tass.DisassembleTask(taskDef, task)
 			convey.So(err, convey.ShouldNotBeNil)
 			convey.So(ctx, convey.ShouldBeNil)

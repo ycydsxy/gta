@@ -165,6 +165,7 @@ func (s *taskSchedulerImp) GoScheduleTask(task *Task) {
 		// scan process so that we won't enter this branch in most cases.
 		go f()
 	} else if err != nil {
+		s.unmarkRunning(task)
 		logger.Errorf("[GoScheduleTask] schedule task failed, err[%v], task_key[%v], task_id[%v]", err, task.TaskKey, task.ID)
 		return
 	}

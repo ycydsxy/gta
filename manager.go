@@ -119,13 +119,13 @@ func (s *TaskManager) Stop(wait bool) {
 
 // Wait blocks the current goroutine and waits for a termination signal. Stop() will be called after the termination
 // signal is received. Maybe this function is useless, because the main function is always blocked by others, like a
-// gin server.
+// http server.
 func (s *TaskManager) Wait() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	select {
 	case <-ch:
-		Stop(false)
+		s.Stop(false)
 		return
 	}
 }

@@ -216,6 +216,33 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 
 func Test_taskSchedulerImp_GoScheduleTask(t *testing.T) {
 	convey.Convey("Test_taskSchedulerImp_GoScheduleTask", t, func() {
-		// TODO
+		tc, _ := newConfig(testDB("Test_taskSchedulerImp_GoScheduleTask"), "tasks", WithPoolSize(1))
+		tr := tc.taskRegister
+		tdal := &taskDALImp{config: tc}
+		tass := &taskAssemblerImp{config: tc}
+		pool, _ := ants.NewPool(tc.PoolSize, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
+		tsch := &taskSchedulerImp{config: tc, register: tr, dal: tdal, assembler: tass, pool: pool}
+		var t1Run int64
+		_ = tr.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
+
+		convey.Convey("wrong status", func() {
+			tsch.GoScheduleTask(&Task{ID: 10001, TaskKey: "t1"})
+			time.Sleep(time.Second)
+			convey.So(t1Run, convey.ShouldEqual, 0)
+		})
+
+		convey.Convey("full pool", func() {
+			_ = pool.Submit(func() { time.Sleep(time.Hour) })
+			tsch.GoScheduleTask(&Task{ID: 10001, TaskKey: "t1", TaskStatus: TaskStatusRunning})
+			time.Sleep(time.Second)
+			convey.So(t1Run, convey.ShouldEqual, 1)
+		})
+
+		convey.Convey("error", func() {
+			pool.Release()
+			tsch.GoScheduleTask(&Task{ID: 10001, TaskKey: "t1", TaskStatus: TaskStatusRunning})
+			time.Sleep(time.Second)
+			convey.So(t1Run, convey.ShouldEqual, 0)
+		})
 	})
 }

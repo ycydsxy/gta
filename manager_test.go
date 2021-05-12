@@ -49,7 +49,6 @@ func TestTaskManager_Start(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldBeNil)
 		})
-
 	})
 }
 
@@ -349,13 +348,11 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 			convey.Convey("transaction succeeded", func() {
 				m.Start()
 				err := m.Transaction(func(tx *gorm.DB) error {
-					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-					if err1 != nil {
-						return err1
+					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
+						return err
 					}
-					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
-					if err2 != nil {
-						return err2
+					if err := m.RunWithTx(tx, context.TODO(), "t2", nil); err != nil {
+						return err
 					}
 					return nil
 				})
@@ -368,17 +365,10 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 			convey.Convey("transaction failed", func() {
 				m.Start()
 				err := m.Transaction(func(tx *gorm.DB) error {
-					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-					if err1 != nil {
-						return err1
+					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
+						return err
 					}
 					return ErrUnexpected
-					// cannot reach here
-					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
-					if err2 != nil {
-						return err2
-					}
-					return nil
 				})
 				m.Stop(true)
 				convey.So(err, convey.ShouldNotBeNil)
@@ -397,13 +387,11 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 			convey.Convey("transaction succeeded", func() {
 				m.Start()
 				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
-					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-					if err1 != nil {
-						return err1
+					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
+						return err
 					}
-					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
-					if err2 != nil {
-						return err2
+					if err := m.RunWithTx(tx, context.TODO(), "t2", nil); err != nil {
+						return err
 					}
 					return nil
 				})
@@ -416,17 +404,10 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 			convey.Convey("transaction failed", func() {
 				m.Start()
 				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
-					err1 := m.RunWithTx(tx, context.TODO(), "t1", nil)
-					if err1 != nil {
-						return err1
+					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
+						return err
 					}
 					return ErrUnexpected
-					// cannot reach here
-					err2 := m.RunWithTx(tx, context.TODO(), "t2", nil)
-					if err2 != nil {
-						return err2
-					}
-					return nil
 				})
 				m.Stop(true)
 				convey.So(err, convey.ShouldNotBeNil)
@@ -575,8 +556,8 @@ func TestTaskManager_Others(t *testing.T) {
 }
 
 func TestTaskManager_Race(t *testing.T) {
-	convey.Convey("TestTaskManager_FullProcess", t, func() {
-		db := testDB("TestTaskManager_FullProcess")
+	convey.Convey("TestTaskManager_Race", t, func() {
+		db := testDB("TestTaskManager_Race")
 		tmFactory := func(tag string) *TaskManager {
 			m := NewTaskManager(db, "tasks",
 				WithConfig(TaskConfig{}),
