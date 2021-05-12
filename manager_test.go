@@ -604,10 +604,9 @@ func TestTaskManager_Race(t *testing.T) {
 				Handler: func(ctx context.Context, arg interface{}) (err error) {
 					return testTaskHandler(ctx, arg.(*testTaskArg))
 				},
-				ArgType:        reflect.TypeOf(&testTaskArg{}),
-				CtxMarshaler:   testTaskCtxMarshaler{},
-				RetryTimes:     1,
-				CleanSucceeded: true,
+				ArgType:      reflect.TypeOf(&testTaskArg{}),
+				CtxMarshaler: testTaskCtxMarshaler{},
+				RetryTimes:   1,
 			})
 			return m
 		}
