@@ -68,8 +68,6 @@ func (s *taskDALImp) GetInitialized(tx *gorm.DB, sensitiveKeys []TaskKey, offset
 		db = db.Where("updated_at >= ? AND task_key IN (?)", time.Now().Add(-offset), sensitiveKeys)
 	} else if len(insensitiveKeys) > 0 {
 		db = db.Where("task_key IN (?)", insensitiveKeys)
-	} else {
-		return nil, ErrUnexpected
 	}
 
 	if err := db.Take(&rule).Error; err == gorm.ErrRecordNotFound {
