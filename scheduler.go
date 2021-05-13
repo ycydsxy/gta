@@ -108,8 +108,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 			}
 		}
 	}
-	// TODO: can roll back
-	logger.Infof("[CreateTask] async task created, task_key[%v], task_id[%v], task_status[%v]", key, task.ID, task.TaskStatus)
+	logger.Infof("[CreateTask] async task created in transaction, task_key[%v], task_id[%v], task_status[%v]", key, task.ID, task.TaskStatus)
 	return nil
 }
 
