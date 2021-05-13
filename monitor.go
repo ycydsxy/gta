@@ -51,7 +51,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 	}
 	newTask.TaskStatus = TaskStatusInitialized
 
-	if err := s.config.DB.Transaction(func(tx *gorm.DB) error {
+	if err := s.config.db().Transaction(func(tx *gorm.DB) error {
 		if task, err := s.dal.GetForUpdate(tx, taskDef.taskID); err != nil {
 			return err
 		} else if task == nil {
@@ -70,7 +70,7 @@ func (s *taskMonitorImp) monitorBuiltinTask(taskDef *TaskDefinition) {
 	}); err == ErrTaskNotFound {
 		// need create, ignore primary key conflict
 		// TODO: distinguish primary key conflict error
-		_ = s.dal.Create(s.config.DB, newTask)
+		_ = s.dal.Create(s.config.db(), newTask)
 		return
 	} else if err != nil {
 		logger.Errorf("[monitorBuiltinTask] update transaction failed, err[%v], task_key[%v]", err, taskDef.key)

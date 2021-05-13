@@ -26,7 +26,7 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 			convey.Convey("built in transaction", func() {
 				convey.Convey("transaction succeeded", func() {
 					convey.Convey("not full pool", func() {
-						db := tc.DB.Set(transactionKey, &sync.Map{})
+						db := tc.db().Set(transactionKey, &sync.Map{})
 						err := db.Transaction(func(tx *gorm.DB) error {
 							if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 								return err
@@ -45,10 +45,10 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 						t2, ok2 := m.(*sync.Map).Load(uint64(2))
 						convey.So(ok2, convey.ShouldBeTrue)
 						convey.So(t2.(*Task).TaskKey, convey.ShouldEqual, "t2")
-						task1, _ := tdal.Get(tc.DB, 1)
+						task1, _ := tdal.Get(tc.db(), 1)
 						convey.So(task1.TaskKey, convey.ShouldEqual, "t1")
 						convey.So(task1.TaskStatus, convey.ShouldEqual, TaskStatusRunning)
-						task2, _ := tdal.Get(tc.DB, 2)
+						task2, _ := tdal.Get(tc.db(), 2)
 						convey.So(task2.TaskKey, convey.ShouldEqual, "t2")
 						convey.So(task2.TaskStatus, convey.ShouldEqual, TaskStatusRunning)
 					})
@@ -56,7 +56,7 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 						pool, _ := ants.NewPool(1, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
 						_ = pool.Submit(func() { time.Sleep(time.Second * 10) })
 						tsch.pool = pool
-						db := tc.DB.Set(transactionKey, &sync.Map{})
+						db := tc.db().Set(transactionKey, &sync.Map{})
 						err := db.Transaction(func(tx *gorm.DB) error {
 							if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 								return err
@@ -73,16 +73,16 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 						convey.So(ok1, convey.ShouldBeFalse)
 						_, ok2 := m.(*sync.Map).Load(uint64(2))
 						convey.So(ok2, convey.ShouldBeFalse)
-						task1, _ := tdal.Get(tc.DB, 1)
+						task1, _ := tdal.Get(tc.db(), 1)
 						convey.So(task1.TaskKey, convey.ShouldEqual, "t1")
 						convey.So(task1.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
-						task2, _ := tdal.Get(tc.DB, 2)
+						task2, _ := tdal.Get(tc.db(), 2)
 						convey.So(task2.TaskKey, convey.ShouldEqual, "t2")
 						convey.So(task2.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
 					})
 				})
 				convey.Convey("transaction failed", func() {
-					db := tc.DB.Set(transactionKey, &sync.Map{})
+					db := tc.db().Set(transactionKey, &sync.Map{})
 					err := db.Transaction(func(tx *gorm.DB) error {
 						if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 							return err
@@ -94,15 +94,15 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 					})
 					convey.So(err, convey.ShouldNotBeNil)
 					convey.So(tsch.runningTaskIDs(), convey.ShouldHaveLength, 0)
-					task1, _ := tdal.Get(tc.DB, 1)
+					task1, _ := tdal.Get(tc.db(), 1)
 					convey.So(task1, convey.ShouldBeNil)
-					task2, _ := tdal.Get(tc.DB, 2)
+					task2, _ := tdal.Get(tc.db(), 2)
 					convey.So(task2, convey.ShouldBeNil)
 				})
 			})
 			convey.Convey("non built in transaction", func() {
 				convey.Convey("transaction succeeded", func() {
-					db := tc.DB
+					db := tc.db()
 					err := db.Transaction(func(tx *gorm.DB) error {
 						if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 							return err
@@ -116,15 +116,15 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 					convey.So(tsch.runningTaskIDs(), convey.ShouldHaveLength, 0)
 					_, ok := db.Get(transactionKey)
 					convey.So(ok, convey.ShouldBeFalse)
-					task1, _ := tdal.Get(tc.DB, 1)
+					task1, _ := tdal.Get(tc.db(), 1)
 					convey.So(task1.TaskKey, convey.ShouldEqual, "t1")
 					convey.So(task1.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
-					task2, _ := tdal.Get(tc.DB, 2)
+					task2, _ := tdal.Get(tc.db(), 2)
 					convey.So(task2.TaskKey, convey.ShouldEqual, "t2")
 					convey.So(task2.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
 				})
 				convey.Convey("transaction failed", func() {
-					db := tc.DB
+					db := tc.db()
 					err := db.Transaction(func(tx *gorm.DB) error {
 						if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 							return err
@@ -138,9 +138,9 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 					convey.So(ok, convey.ShouldBeFalse)
 					convey.So(err, convey.ShouldNotBeNil)
 					convey.So(tsch.runningTaskIDs(), convey.ShouldHaveLength, 0)
-					task1, _ := tdal.Get(tc.DB, 1)
+					task1, _ := tdal.Get(tc.db(), 1)
 					convey.So(task1, convey.ShouldBeNil)
-					task2, _ := tdal.Get(tc.DB, 2)
+					task2, _ := tdal.Get(tc.db(), 2)
 					convey.So(task2, convey.ShouldBeNil)
 				})
 			})
@@ -149,10 +149,10 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 		convey.Convey("ctx cancelled", func() {
 			tc.cancel()
 
-			err := tsch.CreateTask(tc.DB, context.TODO(), "t1", nil)
+			err := tsch.CreateTask(tc.db(), context.TODO(), "t1", nil)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(tsch.runningTaskIDs(), convey.ShouldHaveLength, 0)
-			task1, _ := tdal.Get(tc.DB, 1)
+			task1, _ := tdal.Get(tc.db(), 1)
 			convey.So(task1.TaskKey, convey.ShouldEqual, "t1")
 			convey.So(task1.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
 		})
@@ -161,7 +161,7 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 			tc.DryRun = true
 
 			convey.Convey("built in transaction", func() {
-				db := tc.DB.Set(transactionKey, &sync.Map{})
+				db := tc.db().Set(transactionKey, &sync.Map{})
 				err := db.Transaction(func(tx *gorm.DB) error {
 					if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 						return err
@@ -181,13 +181,13 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 					return true
 				})
 				convey.So(count, convey.ShouldEqual, 2)
-				task1, _ := tdal.Get(tc.DB, 1)
+				task1, _ := tdal.Get(tc.db(), 1)
 				convey.So(task1, convey.ShouldBeNil)
-				task2, _ := tdal.Get(tc.DB, 2)
+				task2, _ := tdal.Get(tc.db(), 2)
 				convey.So(task2, convey.ShouldBeNil)
 			})
 			convey.Convey("non built in transaction", func() {
-				db := tc.DB
+				db := tc.db()
 				err := db.Transaction(func(tx *gorm.DB) error {
 					if err := tsch.CreateTask(tx, context.TODO(), "t1", nil); err != nil {
 						return err
@@ -201,9 +201,9 @@ func Test_taskSchedulerImp_CreateTask(t *testing.T) {
 				convey.So(tsch.runningTaskIDs(), convey.ShouldHaveLength, 0)
 				_, ok := db.Get(transactionKey)
 				convey.So(ok, convey.ShouldBeFalse)
-				task1, _ := tdal.Get(tc.DB, 1)
+				task1, _ := tdal.Get(tc.db(), 1)
 				convey.So(task1, convey.ShouldBeNil)
-				task2, _ := tdal.Get(tc.DB, 2)
+				task2, _ := tdal.Get(tc.db(), 2)
 				convey.So(task2, convey.ShouldBeNil)
 			})
 		})

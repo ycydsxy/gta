@@ -35,7 +35,7 @@ func TestTaskManager_Start(t *testing.T) {
 			m.Start()
 			defer m.Stop(false)
 			convey.So(m.tr.GetBuiltInKeys(), convey.ShouldHaveLength, 2)
-			task, err := m.tdal.Get(m.tc.DB, taskCheckAbnormalID)
+			task, err := m.tdal.Get(m.tc.db(), taskCheckAbnormalID)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldNotBeNil)
 		})
@@ -45,7 +45,7 @@ func TestTaskManager_Start(t *testing.T) {
 			m.Start()
 			defer m.Stop(false)
 			convey.So(m.tr.GetBuiltInKeys(), convey.ShouldHaveLength, 0)
-			task, err := m.tdal.Get(m.tc.DB, taskCheckAbnormalID)
+			task, err := m.tdal.Get(m.tc.db(), taskCheckAbnormalID)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldBeNil)
 		})
@@ -96,7 +96,7 @@ func TestTaskManager_Run(t *testing.T) {
 			m.Stop(true)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(t1Run, convey.ShouldEqual, 1)
-			task, err := m.tdal.Get(m.tc.DB, 10001)
+			task, err := m.tdal.Get(m.tc.db(), 10001)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldNotBeNil)
 			convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
@@ -172,7 +172,7 @@ func TestTaskManager_Run(t *testing.T) {
 				m.Stop(true)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(t1Run, convey.ShouldEqual, 1)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldBeNil)
 			})
@@ -180,7 +180,7 @@ func TestTaskManager_Run(t *testing.T) {
 			convey.Convey("with InitTimeoutSensitive", func() {
 				var t1Run int64
 				m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run), InitTimeoutSensitive: true})
-				err1 := m.tdal.Create(m.tc.DB, &Task{
+				err1 := m.tdal.Create(m.tc.db(), &Task{
 					ID:         10001,
 					TaskKey:    "t1",
 					TaskStatus: TaskStatusInitialized,
@@ -190,7 +190,7 @@ func TestTaskManager_Run(t *testing.T) {
 					CreatedAt:  time.Now().Add(-time.Hour),
 					UpdatedAt:  time.Now().Add(-time.Hour),
 				})
-				err2 := m.tdal.Create(m.tc.DB, &Task{
+				err2 := m.tdal.Create(m.tc.db(), &Task{
 					ID:         10002,
 					TaskKey:    "t1",
 					TaskStatus: TaskStatusInitialized,
@@ -206,7 +206,7 @@ func TestTaskManager_Run(t *testing.T) {
 				time.Sleep(time.Second)
 				m.Stop(true)
 				convey.So(t1Run, convey.ShouldEqual, 1)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldNotBeNil)
 				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
@@ -221,7 +221,7 @@ func TestTaskManager_Run(t *testing.T) {
 			m.Stop(false)
 			err := m.Run(context.TODO(), "t1", nil)
 			convey.So(err, convey.ShouldBeNil)
-			task, err := m.tdal.Get(m.tc.DB, 10001)
+			task, err := m.tdal.Get(m.tc.db(), 10001)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldNotBeNil)
 			convey.So(task.TaskKey, convey.ShouldEqual, "t1")
@@ -253,7 +253,7 @@ func TestTaskManager_Run(t *testing.T) {
 			m.Stop(true)
 			convey.So(errSlice, convey.ShouldHaveLength, 0)
 			convey.So(t1Run, convey.ShouldBeLessThan, 10)
-			task, err := m.tdal.Get(m.tc.DB, 10010)
+			task, err := m.tdal.Get(m.tc.db(), 10010)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldNotBeNil)
 			convey.So(task.TaskKey, convey.ShouldEqual, "t1")
@@ -291,7 +291,7 @@ func TestTaskManager_Run(t *testing.T) {
 				m.Stop(true)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(t1Run, convey.ShouldEqual, 1)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldNotBeNil)
 				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusFailed)
@@ -308,7 +308,7 @@ func TestTaskManager_Run(t *testing.T) {
 				m.Stop(true)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(t1Run, convey.ShouldEqual, 1)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldNotBeNil)
 				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusFailed)
@@ -374,10 +374,10 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 				convey.So(err, convey.ShouldNotBeNil)
 				convey.So(t1Run, convey.ShouldEqual, 0)
 				convey.So(t2Run, convey.ShouldEqual, 0)
-				task1, err := m.tdal.Get(m.tc.DB, 10001)
+				task1, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task1, convey.ShouldBeNil)
-				task2, err := m.tdal.Get(m.tc.DB, 10002)
+				task2, err := m.tdal.Get(m.tc.db(), 10002)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task2, convey.ShouldBeNil)
 			})
@@ -386,7 +386,7 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 		convey.Convey("not builtin transaction", func() {
 			convey.Convey("transaction succeeded", func() {
 				m.Start()
-				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
+				err := m.tc.db().Transaction(func(tx *gorm.DB) error {
 					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
 						return err
 					}
@@ -403,7 +403,7 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 			})
 			convey.Convey("transaction failed", func() {
 				m.Start()
-				err := m.tc.DB.Transaction(func(tx *gorm.DB) error {
+				err := m.tc.db().Transaction(func(tx *gorm.DB) error {
 					if err := m.RunWithTx(tx, context.TODO(), "t1", nil); err != nil {
 						return err
 					}
@@ -413,10 +413,10 @@ func TestTaskManager_RunWithTx(t *testing.T) {
 				convey.So(err, convey.ShouldNotBeNil)
 				convey.So(t1Run, convey.ShouldEqual, 0)
 				convey.So(t2Run, convey.ShouldEqual, 0)
-				task1, err := m.tdal.Get(m.tc.DB, 10001)
+				task1, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task1, convey.ShouldBeNil)
-				task2, err := m.tdal.Get(m.tc.DB, 10002)
+				task2, err := m.tdal.Get(m.tc.db(), 10002)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task2, convey.ShouldBeNil)
 			})
@@ -449,7 +449,7 @@ func TestTaskManager_Stop(t *testing.T) {
 				err := m.Run(context.TODO(), "t1", nil)
 				m.Stop(true)
 				convey.So(err, convey.ShouldBeNil)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldNotBeNil)
 				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusSucceeded)
@@ -464,7 +464,7 @@ func TestTaskManager_Stop(t *testing.T) {
 				err := m.Run(context.TODO(), "t1", nil)
 				m.Stop(false)
 				convey.So(err, convey.ShouldBeNil)
-				task, err := m.tdal.Get(m.tc.DB, 10001)
+				task, err := m.tdal.Get(m.tc.db(), 10001)
 				convey.So(err, convey.ShouldBeNil)
 				convey.So(task, convey.ShouldNotBeNil)
 				convey.So(task.TaskStatus, convey.ShouldEqual, TaskStatusInitialized)
@@ -481,7 +481,7 @@ func TestTaskManager_Stop(t *testing.T) {
 			err := m.Run(context.TODO(), "t1", nil)
 			m.Stop(true)
 			convey.So(err, convey.ShouldBeNil)
-			task, err := m.tdal.Get(m.tc.DB, 10001)
+			task, err := m.tdal.Get(m.tc.db(), 10001)
 			convey.So(err, convey.ShouldBeNil)
 			convey.So(task, convey.ShouldBeNil)
 		})
@@ -493,7 +493,7 @@ func TestTaskManager_ForceRerunTasks(t *testing.T) {
 	var t1Run int64
 	m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 	convey.Convey("TestTaskManager_ForceRerunTasks", t, func() {
-		_ = m.tdal.Create(m.tc.DB, &Task{
+		_ = m.tdal.Create(m.tc.db(), &Task{
 			ID:         10001,
 			TaskKey:    "t1",
 			TaskStatus: TaskStatusFailed,
@@ -514,7 +514,7 @@ func TestTaskManager_QueryUnsuccessfulTasks(t *testing.T) {
 	var t1Run int64
 	m.Register("t1", TaskDefinition{Handler: testCountHandler(&t1Run)})
 	convey.Convey("TestTaskManager_QueryUnsuccessfulTasks", t, func() {
-		_ = m.tdal.Create(m.tc.DB, &Task{
+		_ = m.tdal.Create(m.tc.db(), &Task{
 			ID:         10001,
 			TaskKey:    "t1",
 			TaskStatus: TaskStatusFailed,
@@ -628,7 +628,7 @@ func TestTaskManager_Race(t *testing.T) {
 		// run with tx - not builtin
 		for i := 0; i < 5; i++ {
 			ctx := mockTaskContext(fmt.Sprintf("request_tx_nonbuiltin_%d", i), fmt.Sprintf("user%d", i))
-			err := m0.tc.DB.Transaction(func(tx *gorm.DB) error {
+			err := m0.tc.db().Transaction(func(tx *gorm.DB) error {
 				if err := m0.RunWithTx(tx, ctx, "t", &testTaskArg{A: i, B: 2 * i}); err != nil {
 					return err
 				}

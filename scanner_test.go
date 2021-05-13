@@ -15,7 +15,7 @@ func Test_taskScannerImp_claimInitializedTask(t *testing.T) {
 			tdal := &taskDALImp{config: tc}
 			tscn := &taskScannerImp{config: tc, register: tr, dal: tdal}
 			_ = tr.Register("t1", TaskDefinition{Handler: testWrappedHandler()})
-			_ = tdal.Create(tc.DB, &Task{TaskKey: "t1", TaskStatus: TaskStatusInitialized})
+			_ = tdal.Create(tc.db(), &Task{TaskKey: "t1", TaskStatus: TaskStatusInitialized})
 			tc.cancel()
 			task, err := tscn.claimInitializedTask()
 			convey.So(err, convey.ShouldBeNil)
