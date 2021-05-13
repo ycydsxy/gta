@@ -83,10 +83,10 @@ func (s *taskScannerImp) switchOnInstantScan() {
 }
 
 func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
-	c := s.config
+	tc := s.config
 
 	sensitiveKeys, insensitiveKeys := s.register.GroupKeysByInitTimeoutSensitivity()
-	task, err := s.dal.GetInitialized(c.DB, sensitiveKeys, c.InitializedTimeout, insensitiveKeys)
+	task, err := s.dal.GetInitialized(tc.db(), sensitiveKeys, tc.InitializedTimeout, insensitiveKeys)
 	if err != nil {
 		return nil, err
 	} else if task == nil {
@@ -95,11 +95,11 @@ func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
 	}
 
 	select {
-	case <-c.done():
+	case <-tc.done():
 		// abort claim when cancel signal received
 		return nil, nil
 	default:
-		if rowsAffected, err := s.dal.UpdateStatusByIDs(c.DB, []uint64{task.ID}, task.TaskStatus, TaskStatusRunning); err != nil {
+		if rowsAffected, err := s.dal.UpdateStatusByIDs(tc.db(), []uint64{task.ID}, task.TaskStatus, TaskStatusRunning); err != nil {
 			return nil, err
 		} else if rowsAffected == 0 {
 			// task is claimed by others, ignore error

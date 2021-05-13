@@ -129,6 +129,10 @@ func (s *TaskConfig) cancel() {
 	s.cancelFunc()
 }
 
+func (s *TaskConfig) db() *gorm.DB {
+	return s.DB
+}
+
 func newConfig(db *gorm.DB, table string, options ...Option) (*TaskConfig, error) {
 	c := (&TaskConfig{}).load(options...).load(withDB(db)).load(withTable(table))
 	if err := c.init(); err != nil {

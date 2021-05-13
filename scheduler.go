@@ -34,7 +34,7 @@ type taskSchedulerImp struct {
 }
 
 func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
-	db := s.config.DB.Set(transactionKey, &sync.Map{})
+	db := s.config.db().Set(transactionKey, &sync.Map{})
 
 	if err := db.Transaction(fc); err != nil {
 		return err
@@ -135,7 +135,7 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 		} else if !wait || (s.config.WaitTimeout > 0 && time.Since(waitStart) > s.config.WaitTimeout) {
 			if !s.config.DryRun {
 				// change remaining tasks status to initialized
-				rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, taskIDs, TaskStatusRunning, TaskStatusInitialized)
+				rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.db(), taskIDs, TaskStatusRunning, TaskStatusInitialized)
 				if err != nil {
 					logger.Errorf("[Stop] update task status from running to initialized failed, err[%v]", err)
 					return
@@ -248,13 +248,13 @@ func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *Task) (err
 func (s *taskSchedulerImp) stopRunning(task *Task, taskDef *TaskDefinition, toStatus TaskStatus) error {
 	if !s.config.DryRun {
 		if taskDef.CleanSucceeded && toStatus == TaskStatusSucceeded {
-			if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.DB, task.ID, task.TaskStatus); err != nil {
+			if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.db(), task.ID, task.TaskStatus); err != nil {
 				return err
 			} else if rowsAffected == 0 {
 				return ErrZeroRowsAffected
 			}
 		} else {
-			if rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.DB, []uint64{task.ID}, task.TaskStatus, toStatus); err != nil {
+			if rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.db(), []uint64{task.ID}, task.TaskStatus, toStatus); err != nil {
 				return err
 			} else if rowsAffected == 0 {
 				return ErrZeroRowsAffected

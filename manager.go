@@ -128,12 +128,12 @@ func (s *TaskManager) Stop(wait bool) {
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return s.tdal.UpdateStatusByIDs(s.tc.DB, taskIDs, status, TaskStatusInitialized)
+	return s.tdal.UpdateStatusByIDs(s.tc.db(), taskIDs, status, TaskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
 func (s *TaskManager) QueryUnsuccessfulTasks(limit, offset int) ([]Task, error) {
-	return s.tdal.GetSliceExcludeSucceeded(s.tc.DB, s.tr.GetBuiltInKeys(), limit, offset)
+	return s.tdal.GetSliceExcludeSucceeded(s.tc.db(), s.tr.GetBuiltInKeys(), limit, offset)
 }
 
 func (s *TaskManager) registerBuiltinTasks() {
