@@ -20,7 +20,7 @@ type taskScannerImp struct {
 func (s *taskScannerImp) GoScanAndSchedule() {
 	logger := s.config.logger()
 	logger.Infof("[GoScanAndSchedule] scan and run start, scan interval[%v], instant scan interval[%v]",
-		s.config.ScanInterval, s.config.InstantScanInvertal)
+		s.config.ScanInterval, s.config.InstantScanInterval)
 	go func() {
 		defer panicHandler()
 		for {
@@ -61,7 +61,7 @@ func (s *taskScannerImp) scanAndSchedule() {
 
 func (s *taskScannerImp) scanInterval() time.Duration {
 	if s.needInstantScan() {
-		return randomInterval(s.config.InstantScanInvertal)
+		return randomInterval(s.config.InstantScanInterval)
 	}
 	return randomInterval(s.config.ScanInterval)
 }
