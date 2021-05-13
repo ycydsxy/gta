@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/smartystreets/goconvey/convey"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -572,9 +573,9 @@ func TestTaskManager_Others(t *testing.T) {
 	})
 }
 
-func TestTaskManager_Race(t *testing.T) {
-	convey.Convey("TestTaskManager_Race", t, func() {
-		db := testDB("TestTaskManager_Race")
+func TestTaskManager_RaceWithMySQL(t *testing.T) {
+	convey.Convey("TestTaskManager_RaceWithMySQL", t, func() {
+		db, _ := gorm.Open(mysql.Open("root:123456@(mysql_test:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"), &gorm.Config{})
 		tmFactory := func(tag string) *TaskManager {
 			m := NewTaskManager(db, "tasks",
 				WithConfig(TaskConfig{}),
