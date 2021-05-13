@@ -575,7 +575,7 @@ func TestTaskManager_Others(t *testing.T) {
 
 func TestTaskManager_RaceWithMySQL(t *testing.T) {
 	convey.Convey("TestTaskManager_RaceWithMySQL", t, func() {
-		db, _ := gorm.Open(mysql.Open("root:123456@(mysql_test:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"), &gorm.Config{})
+		db, _ := gorm.Open(mysql.Open("root@(127.0.0.1:3306)/test_db?charset=utf8&parseTime=True&loc=UTC"))
 		tmFactory := func(tag string) *TaskManager {
 			m := NewTaskManager(db, "tasks",
 				WithConfig(TaskConfig{}),
