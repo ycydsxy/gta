@@ -44,7 +44,7 @@ func Test_Config_init(t *testing.T) {
 		})
 
 		convey.Convey("invalid instant scan interval", func() {
-			tc := TaskConfig{DB: defaultDB, Table: defaultTable, InstantScanInvertal: time.Hour * 365}
+			tc := TaskConfig{DB: defaultDB, Table: defaultTable, InstantScanInterval: time.Hour * 365}
 			convey.So(tc.init(), convey.ShouldNotBeNil)
 		})
 

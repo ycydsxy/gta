@@ -29,7 +29,7 @@ type TaskConfig struct {
 	// optional, scan interval
 	ScanInterval time.Duration
 	// optional, instant scan interval
-	InstantScanInvertal time.Duration
+	InstantScanInterval time.Duration
 	// optional, context marshaler to store or recover a context
 	CtxMarshaler CtxMarshaler
 	// optional, callback function for abnormal tasks
@@ -68,8 +68,8 @@ func (s *TaskConfig) init() error {
 	if s.ScanInterval <= 0 {
 		s.ScanInterval = defaultScanInterval
 	}
-	if s.InstantScanInvertal <= 0 {
-		s.InstantScanInvertal = defaultInstantScanInvertal
+	if s.InstantScanInterval <= 0 {
+		s.InstantScanInterval = defaultInstantScanInvertal
 	}
 	if s.RunningTimeout <= 0 {
 		s.RunningTimeout = defaultRunningTimeout
@@ -100,7 +100,7 @@ func (s *TaskConfig) init() error {
 	if s.ScanInterval > s.StorageTimeout || s.ScanInterval > s.InitializedTimeout || s.ScanInterval > s.RunningTimeout {
 		return ErrConfigInvalidScanInterval
 	}
-	if s.InstantScanInvertal > s.ScanInterval {
+	if s.InstantScanInterval > s.ScanInterval {
 		return ErrConfigInvalidInstantScanInterval
 	}
 
@@ -198,9 +198,9 @@ func WithScanInterval(d time.Duration) Option {
 	return func(c *TaskConfig) { c.ScanInterval = d }
 }
 
-// WithInstantScanInterval set the InstantScanInvertal option.
+// WithInstantScanInterval set the InstantScanInterval option.
 func WithInstantScanInterval(d time.Duration) Option {
-	return func(c *TaskConfig) { c.InstantScanInvertal = d }
+	return func(c *TaskConfig) { c.InstantScanInterval = d }
 }
 
 // WithCtxMarshaler set the CtxMarshaler option.
