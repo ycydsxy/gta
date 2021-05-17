@@ -85,11 +85,11 @@ func main() {
 	}
 }
 ```
-# Configuration item
+# Configuration
 
 ## Global optional configuration
 
-When calling `StartWithOptions` or `NewTaskManager`, one or more optional configurations can be specified. The framework will be applied according to the incoming order of configuration. If the configuration name is `XXX`, the configuration can be specified with `WithXXX`. For example, the following code can specify that the pool size is 10 and the dry run flag is true:
+When calling `StartWithOptions` or `NewTaskManager`, one or more optional configurations can be specified according to the incoming order. If the configuration name is `XXX`, the configuration can be specified with `WithXXX`. For example, the following code can specify that the pool size is 10 and the dry run flag is true:
 
 ```golang
 gta.StartWithOptions(db, "tasks", gta.WithPoolSize(10), gta.WithDryRun(true))
@@ -101,31 +101,31 @@ All optional configurations and default values are as follows:
 | ------------------- | ----------------------------------------- | -------------------- | ------------------------------------------------------------ |
 |Context | context. Context | context.Background() | root context, used for the framework itself|
 |LoggerFactory | func(ctx context.Context) Logger | defaultLoggerFactory | log factory method for log printing|
-|StorageTimeout | time.Duration | 1 week | storage timeout determines how long a completed task will be cleaned up|
-|InitializedTimeout | time.Duration | 5 minutes | initialization timeout determines how long an initialized task will be considered as an exception|
-|WaitTimeout | time.Duration | 30 minutes | running timeout determines how long an ongoing task will be considered abnormal|
-|Waittimeout | time.Duration | waiting all the time | waiting timeout, which determines the longest execution time of the `Stop` function when a task is running |
-|ScanInterval | time.Duration | 5 seconds | scanning interval length, which determines the speed of scanning initialization task under normal circumstances|
-|InstantScanInvertal | time. Duration | 100 ms | fast scan interval determines the scan speed when there are unprocessed initialization tasks|
-|CtxMarshaler | CtxMarshaler | defaultCtxMarshaler | context serialization tool, which determines how context is serialized|
-|CheckCallback | func(logger Logger, abnormalTasks []Task) | defaultcheckcallback | exception task check callback function, which determines how to handle the detected exception task|
-|DryRun | bool | false | dry run flag is used to test and decide whether to run without relying on the database|
-|PoolSize | int | math.MaxInt32 | pool size, how many coroutines can be used at the bottom to perform tasks|
+|StorageTimeout | time.Duration | 1 week | determines how long a completed task will be cleaned up|
+|InitializedTimeout | time.Duration | 5 minutes | determines how long an initialized task will be considered abnormal|
+|RunningTimeout | time.Duration | 30 minutes | determines how long an ongoing task will be considered abnormal|
+|WaitTimeout | time.Duration | waiting all the time | determines the longest execution time of the `Stop` function when a task is running |
+|ScanInterval | time.Duration | 5 seconds | determines the speed of scanning initialized task under normal circumstances|
+|InstantScanInvertal | time. Duration | 100 ms | determines the scan speed when there are unprocessed initialized tasks|
+|CtxMarshaler | CtxMarshaler | defaultCtxMarshaler | determines how context is serialized|
+|CheckCallback | func(logger Logger, abnormalTasks []Task) | defaultcheckcallback | determines how to handle the detected abnormal task|
+|DryRun | bool | false | dry run flag is used to test and determines whether to run without relying on the database|
+|PoolSize | int | math.MaxInt32 | determines how many goroutines can be used to run tasks|
 ## Single task definition
 When calling `Register` for task registration, you need to pass in the corresponding task definition, as follows:
 
 |name|type|default value|meaning|
 | -------------------- | ------------------------------------------------------ | ---------------- | ------------------------------------------------------------ |
 |Handler | func(ctx context.Context, arg interface{}) (err error) | no | required, task handler|
-|ArgType | reflect.Type | nil | task input parameter type determines the actual type of arg in the task processing function. If it is empty, the type of arg is `map[string]interface{}` |
-|CtxMarshaler | CtxMarshaler | global CtxMarshaler | task context serialization tool class, which determines how to serialize the context.context of a task|
+|ArgType | reflect.Type | nil | determines the actual type of arg in the task processing function. If it is empty, the type of arg is `map[string]interface{}` |
+|CtxMarshaler | CtxMarshaler | global CtxMarshaler | determines how to serialize the context.context of a task|
 |RetryTimes | int | 0 | the maximum number of retries when a task fails. Tasks exceeding this value will be marked as failed|
 |RetryInterval | func(times int) time.Duration | 1 second | the interval between two retries of task execution error|
-|CleanSucceeded | bool | false | whether to clear the task record immediately after the success. If so, the task record will be cleared immediately after the success of the task|
-|InitTimeoutSensitive | bool | false | sensitive to initialization timeout? If so, it cannot be scanned and scheduled after initialization timeout|
+|CleanSucceeded | bool | false |whether to clear the task record immediately after the success. If so, the task record will be cleared immediately after succeeded|
+|InitTimeoutSensitive | bool | false | determines whether the task is sensitive to `InitializedTimeout`. If so, it cannot be scanned and scheduled after `InitializedTimeout`|
 # Frequently asked questions
 
-## What is an exception task? How to detect abnormal tasks?
+## What is an abnormal task? How to detect abnormal tasks?
 
 Abnormal tasks include tasks that have not been scheduled for a long time, tasks that have timed out, or tasks that have been aborted due to non graceful shutdown
 
@@ -139,15 +139,15 @@ In the current design, the steps of submitting tasks are not blocked. When the p
 
 If it is based on the Commit Hook mechanism, there is almost no delay, such as calling `Run` in the case of sufficient co pool or calling `RunWithTx` in the built-in `Transaction`.
 
-If the pool is full, or the `RunWithTx` is invoked in a non built `Transaction`, then the asynchronous task is scheduled based on the scan mechanism. At this time, the schedule is delayed. The delay time is the time required for all instances to compete and schedule the task, and is related to the scan interval, the pool pool idle time and the backlog of tasks.
+If the pool is full, or the `RunWithTx` is invoked in a non built `Transaction`, then the asynchronous task is scheduled based on the scan mechanism. At this time, the schedule is delayed. The delay time is the time required for all instances to compete and schedule the task, and is related to the scan interval, the  pool idle time and the backlog of tasks.
 
 ## The task consumption ability of scanning mechanism?
 
-The maximum consumption capacity is `N*1/InstantScanInterval` tasks per second, where n is the number of instances, instantscaninterval is the fast scan interval, and the consumption capacity of a single instance is set to 10 / s by default. The scheduling ability of scanning mechanism is limited, and it is an auxiliary scheduling method. Reducing instantscaninterval can improve the consumption ability, but it will also increase the database pressure. Therefore, under normal circumstances, we should try to use commit hook mechanism
+The maximum consumption capacity is `N*1/InstantScanInterval` tasks per second, where n is the number of instances, instantscaninterval is the fast scan interval, and the consumption capacity of a single instance is set to 10/s by default. The scheduling ability of scanning mechanism is limited, and it is an auxiliary scheduling method. Reducing `InstantScanInterval` can improve the consumption ability, but it will also increase the database pressure. Therefore, under normal circumstances, we should try to use commit hook mechanism
 
-## How to handle exceptions and failed tasks?
+## How to handle abnormal and failed tasks?
 
-Under normal circumstances, the exception and failure of a task are small probability events. If the exception and failure of a task are caused by some factors (such as external resource exception, abnormal downtime, etc.), it can be rerun by manually pulling the corresponding task. `TaskManager` provides corresponding APIs, such as `ForceRerunTasks` and `QueryUnsuccessfulTasks`
+Under normal circumstances, the exception and failure of a task are small probability events. If the exception and failure of a task are caused by some factors (such as external resource exception, abnormal downtime, etc.), it can be rescheduled manually with corresponding APIs provided by `TaskManager`, such as `ForceRerunTasks` and `QueryUnsuccessfulTasks`
 
 ## How to test?
 
