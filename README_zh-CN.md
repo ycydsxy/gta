@@ -91,7 +91,7 @@ func main() {
 gta.StartWithOptions(db, "tasks", gta.WithPoolSize(10), gta.WithDryRun(true))
 ```
 所有可选配置及默认值如下：
-| **配置名**          | **类型**                                  | **默认值**           | **含义**                                                   |
+| 配置名          | 类型                                 | 默认值           | 含义                                                   |
 | ------------------- | ----------------------------------------- | -------------------- | ---------------------------------------------------------- |
 | Context             | context.Context                           | context.Background() | 根上下文，用于框架本身                                     |
 | LoggerFactory       | func(ctx context.Context) Logger          | defaultLoggerFactory | 日志工厂方法，用于日志打印                           |
@@ -107,7 +107,7 @@ gta.StartWithOptions(db, "tasks", gta.WithPoolSize(10), gta.WithDryRun(true))
 | PoolSize            | int                                       | math.MaxInt32      | 协程池大小，底层最多用多少个协程执行任务                   |
 ## 单个任务定义
 在调用 `Register` 进行任务注册时，需要传入对应的任务定义（TaskDefinition），具体如下：
-| **配置名**           | **类型**                                               | **默认值**        | **含义**                                                     |
+| 配置名           | 类型                                               | 默认值        | 含义                                                     |
 | -------------------- | ------------------------------------------------------ | ----------------- | ----------------------------------------------------------|
 | Handler              | func(ctx context.Context, arg interface{}) (err error) | 无                | 必须，任务处理函数                                           |
 | ArgType              | reflect.Type                                           | nil               | 任务入参类型，决定任务处理函数中 arg 的实际类型，如果为空，则 arg 的类型为 `map[string]interface{}` |
@@ -136,11 +136,11 @@ gta.StartWithOptions(db, "tasks", gta.WithPoolSize(10), gta.WithDryRun(true))
 
 ## 扫描机制的任务消费能力？
 
-最大消费能力为每秒 `N * 1 / InstantScanInterval` 个任务，其中 N 为实例数量，InstantScanInterval 为快速扫描间隔，默认设置下单实例的消费能力为 10 个/秒。扫描机制的调度能力有限，其本身是一种辅助的调度方式，调小 InstantScanInterval 能够提高消费能力但同时也会提升数据库压力，故正常的情况还是尽量使用 Commit Hook 机制
+最大消费能力为每秒 `N * 1 / InstantScanInterval` 个任务，其中 N 为实例数量，`InstantScanInterval` 为快速扫描间隔，默认设置下单实例的消费能力为 10 个/秒。扫描机制的调度能力有限，其本身是一种辅助的调度方式，调小 `InstantScanInterval` 能够提高消费能力但同时也会提升数据库压力，故正常的情况还是尽量使用 Commit Hook 机制
 
 ## 如何处理异常和失败的任务？
 
-在正常情况下，任务的异常和失败是小概率事件，若由于某些因素导致的任务异常和失败（如外部资源异常、异常宕机等），可以通过手动拉起对应任务的方式进行重跑，`TaskManager` 提供了相应的  API，如 `ForceRerunTasks` 和 `QueryUnsuccessfulTasks` 等
+在正常情况下，任务的异常和失败是小概率事件，若由于某些因素导致的任务异常和失败（如外部资源异常、异常宕机等），可以通过手动的方式进行重新调度，`TaskManager` 提供了相应的  API，如 `ForceRerunTasks` 和 `QueryUnsuccessfulTasks` 等
 
 ## 如何进行测试？
 
