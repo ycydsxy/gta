@@ -25,7 +25,7 @@ type taskScheduler interface {
 }
 
 type taskSchedulerImp struct {
-	config     *TaskConfig
+	*options
 	register   taskRegister
 	dal        taskDAL
 	assembler  taskAssembler
@@ -34,7 +34,7 @@ type taskSchedulerImp struct {
 }
 
 func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
-	db := s.config.db().Set(transactionKey, &sync.Map{})
+	db := s.getDB().Set(transactionKey, &sync.Map{})
 
 	if err := db.Transaction(fc); err != nil {
 		return err
@@ -50,7 +50,7 @@ func (s *taskSchedulerImp) Transaction(fc func(tx *gorm.DB) error) error {
 }
 
 func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key TaskKey, arg interface{}) error {
-	logger := s.config.LoggerFactory(ctxIn)
+	logger := s.loggerFactory(ctxIn)
 
 	taskDef, err := s.register.GetDefinition(key)
 	if err != nil {
@@ -62,7 +62,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 	}
 
 	select {
-	case <-s.config.done():
+	case <-s.done():
 		// may still accept create task requests when cancel signal is received
 		if err := s.createInitializedTask(tx, task); err != nil {
 			return err
@@ -70,7 +70,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 	default:
 		if toScheduleTasks, ok := tx.Get(transactionKey); ok {
 			// buitin transaction, try to create running task
-			if !s.config.DryRun {
+			if !s.dryRun {
 				if s.CanSchedule() {
 					if err := s.createRunningTask(tx, task); err != nil {
 						return err
@@ -90,7 +90,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 			}
 		} else {
 			// not builtin transaction, create initialized task
-			if !s.config.DryRun {
+			if !s.dryRun {
 				if err := s.createInitializedTask(tx, task); err != nil {
 					return err
 				}
@@ -114,7 +114,7 @@ func (s *taskSchedulerImp) CreateTask(tx *gorm.DB, ctxIn context.Context, key Ta
 
 func (s *taskSchedulerImp) Stop(wait bool) {
 	defer s.pool.Release()
-	logger := s.config.logger()
+	logger := s.logger()
 
 	// first check, if tasks len is zero, return immediately
 	taskIDs := s.runningTaskIDs()
@@ -131,10 +131,10 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 		if len(taskIDs) <= 0 {
 			logger.Infof("[Stop] current running tasks finished")
 			return
-		} else if !wait || (s.config.WaitTimeout > 0 && time.Since(waitStart) > s.config.WaitTimeout) {
-			if !s.config.DryRun {
+		} else if !wait || (s.waitTimeout > 0 && time.Since(waitStart) > s.waitTimeout) {
+			if !s.dryRun {
 				// change remaining tasks status to initialized
-				rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.db(), taskIDs, TaskStatusRunning, TaskStatusInitialized)
+				rowsAffected, err := s.dal.UpdateStatusByIDs(s.getDB(), taskIDs, TaskStatusRunning, TaskStatusInitialized)
 				if err != nil {
 					logger.Errorf("[Stop] update task status from running to initialized failed, err[%v]", err)
 					return
@@ -149,7 +149,7 @@ func (s *taskSchedulerImp) Stop(wait bool) {
 }
 
 func (s *taskSchedulerImp) GoScheduleTask(task *Task) {
-	logger := s.config.logger()
+	logger := s.logger()
 
 	if task.TaskStatus != TaskStatusRunning {
 		logger.Errorf("[GoScheduleTask] invalid task status, task_key[%v], task_status[%v]", task.TaskKey, task.TaskStatus)
@@ -179,7 +179,7 @@ func (s *taskSchedulerImp) CanSchedule() bool {
 }
 
 func (s *taskSchedulerImp) scheduleTask(task *Task) {
-	logger := s.config.logger()
+	logger := s.logger()
 	taskDef, _ := s.register.GetDefinition(task.TaskKey)
 	succeeded := false
 	startTime := time.Now()
@@ -215,7 +215,7 @@ func (s *taskSchedulerImp) scheduleTask(task *Task) {
 }
 
 func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *Task) (err error) {
-	logger := s.config.logger()
+	logger := s.logger()
 
 	startTime := time.Now()
 	defer func() {
@@ -245,15 +245,15 @@ func (s *taskSchedulerImp) executeTask(taskDef *TaskDefinition, task *Task) (err
 }
 
 func (s *taskSchedulerImp) stopRunning(task *Task, taskDef *TaskDefinition, toStatus TaskStatus) error {
-	if !s.config.DryRun {
+	if !s.dryRun {
 		if taskDef.CleanSucceeded && toStatus == TaskStatusSucceeded {
-			if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.config.db(), task.ID, task.TaskStatus); err != nil {
+			if rowsAffected, err := s.dal.DeleteByIDAndStatus(s.getDB(), task.ID, task.TaskStatus); err != nil {
 				return err
 			} else if rowsAffected == 0 {
 				return ErrZeroRowsAffected
 			}
 		} else {
-			if rowsAffected, err := s.dal.UpdateStatusByIDs(s.config.db(), []uint64{task.ID}, task.TaskStatus, toStatus); err != nil {
+			if rowsAffected, err := s.dal.UpdateStatusByIDs(s.getDB(), []uint64{task.ID}, task.TaskStatus, toStatus); err != nil {
 				return err
 			} else if rowsAffected == 0 {
 				return ErrZeroRowsAffected

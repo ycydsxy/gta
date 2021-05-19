@@ -56,11 +56,11 @@ func (s *TaskDefinition) init(key TaskKey) error {
 	return nil
 }
 
-func (s *TaskDefinition) ctxMarshaler(config *TaskConfig) CtxMarshaler {
+func (s *TaskDefinition) ctxMarshaler(global CtxMarshaler) CtxMarshaler {
 	if m := s.CtxMarshaler; m != nil {
 		return m
 	}
-	return config.CtxMarshaler
+	return global
 }
 
 func (s *TaskDefinition) retryInterval(times int) time.Duration {

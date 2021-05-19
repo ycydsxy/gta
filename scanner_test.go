@@ -10,12 +10,12 @@ import (
 func Test_taskScannerImp_claimInitializedTask(t *testing.T) {
 	convey.Convey("Test_taskScannerImp_claimInitializedTask", t, func() {
 		convey.Convey("ctx cancelled", func() {
-			tc, _ := newConfig(testDB("Test_taskScannerImp_claimInitializedTask"), "tasks")
+			tc, _ := newOptions(testDB("Test_taskScannerImp_claimInitializedTask"), "tasks")
 			tr := &taskRegisterImp{}
-			tdal := &taskDALImp{config: tc}
-			tscn := &taskScannerImp{config: tc, register: tr, dal: tdal}
+			tdal := &taskDALImp{options: tc}
+			tscn := &taskScannerImp{options: tc, register: tr, dal: tdal}
 			_ = tr.Register("t1", TaskDefinition{Handler: testWrappedHandler()})
-			_ = tdal.Create(tc.db(), &Task{TaskKey: "t1", TaskStatus: TaskStatusInitialized})
+			_ = tdal.Create(tc.getDB(), &Task{TaskKey: "t1", TaskStatus: TaskStatusInitialized})
 			tc.cancel()
 			task, err := tscn.claimInitializedTask()
 			convey.So(err, convey.ShouldBeNil)
@@ -23,10 +23,10 @@ func Test_taskScannerImp_claimInitializedTask(t *testing.T) {
 		})
 
 		convey.Convey("error", func() {
-			tc, _ := newConfig(testDB("Test_taskScannerImp_claimInitializedTask"), "not exist")
+			tc, _ := newOptions(testDB("Test_taskScannerImp_claimInitializedTask"), "not exist")
 			tr := &taskRegisterImp{}
-			tdal := &taskDALImp{config: tc}
-			tscn := &taskScannerImp{config: tc, register: tr, dal: tdal}
+			tdal := &taskDALImp{options: tc}
+			tscn := &taskScannerImp{options: tc, register: tr, dal: tdal}
 			_, err := tscn.claimInitializedTask()
 			convey.So(err, convey.ShouldNotBeNil)
 		})
@@ -37,12 +37,12 @@ func Test_taskScannerImp_claimInitializedTask(t *testing.T) {
 func Test_taskScannerImp_scanAndSchedule(t *testing.T) {
 	convey.Convey("Test_taskScannerImp_scanAndSchedule", t, func() {
 		convey.Convey("error", func() {
-			tc, _ := newConfig(testDB("Test_taskScannerImp_scanAndSchedule"), "not exist")
+			tc, _ := newOptions(testDB("Test_taskScannerImp_scanAndSchedule"), "not exist")
 			tr := &taskRegisterImp{}
-			tdal := &taskDALImp{config: tc}
+			tdal := &taskDALImp{options: tc}
 			pool, _ := ants.NewPool(1)
 			tsch := &taskSchedulerImp{pool: pool}
-			tscn := &taskScannerImp{config: tc, register: tr, dal: tdal, scheduler: tsch}
+			tscn := &taskScannerImp{options: tc, register: tr, dal: tdal, scheduler: tsch}
 			convey.So(func() { tscn.scanAndSchedule() }, convey.ShouldNotPanic)
 		})
 	})

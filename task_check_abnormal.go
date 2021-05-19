@@ -19,33 +19,31 @@ type checkAbnormalTaskReq struct {
 }
 
 func registerCheckAbnormalTask(tm *TaskManager) {
-	tc := tm.tc
 	tm.Register(taskCheckAbnormal, TaskDefinition{
 		Handler: checkAbnormalHandler(tm),
 		ArgType: reflect.TypeOf(checkAbnormalTaskReq{}),
 		builtin: true,
 		taskID:  taskCheckAbnormalID,
 		argument: checkAbnormalTaskReq{
-			StorageTimeout:     tc.StorageTimeout,
-			RunningTimeout:     tc.RunningTimeout,
-			InitializedTimeout: tc.InitializedTimeout,
+			StorageTimeout:     tm.storageTimeout,
+			RunningTimeout:     tm.runningTimeout,
+			InitializedTimeout: tm.initializedTimeout,
 		},
 		loopInterval: time.Duration(
-			minInt64(int64(tc.InitializedTimeout)/2, int64(tc.RunningTimeout)/2, int64(tc.ScanInterval)*15),
+			minInt64(int64(tm.initializedTimeout)/2, int64(tm.runningTimeout)/2, int64(tm.scanInterval)*15),
 		),
 	})
 }
 
 func checkAbnormalHandler(tm *TaskManager) TaskHandler {
-	tc := tm.tc
 	return func(ctx context.Context, arg interface{}) (err error) {
 		req := arg.(checkAbnormalTaskReq)
-		abnormalRunning, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.db(), req.StorageTimeout,
+		abnormalRunning, err := tm.tdal.GetSliceByOffsetsAndStatus(tm.getDB(), req.StorageTimeout,
 			req.RunningTimeout, TaskStatusRunning)
 		if err != nil {
 			return fmt.Errorf("check abnormal running failed, err[%w]", err)
 		}
-		abnormalInitilized, err := tm.tdal.GetSliceByOffsetsAndStatus(tc.db(), req.StorageTimeout,
+		abnormalInitilized, err := tm.tdal.GetSliceByOffsetsAndStatus(tm.getDB(), req.StorageTimeout,
 			req.InitializedTimeout, TaskStatusInitialized)
 		if err != nil {
 			return fmt.Errorf("check abnormal running failed, err[%w]", err)
@@ -71,7 +69,7 @@ func checkAbnormalHandler(tm *TaskManager) TaskHandler {
 			abnormalTasks = append(abnormalTasks, t)
 		}
 
-		tc.CheckCallback(tc.logger(), abnormalTasks)
+		tm.checkCallback(tm.logger(), abnormalTasks)
 		return nil
 	}
 }
