@@ -10,7 +10,7 @@ type taskScanner interface {
 }
 
 type taskScannerImp struct {
-	config      *TaskConfig
+	*options
 	register    taskRegister
 	dal         taskDAL
 	scheduler   taskScheduler
@@ -18,29 +18,28 @@ type taskScannerImp struct {
 }
 
 func (s *taskScannerImp) GoScanAndSchedule() {
-	logger := s.config.logger()
-	logger.Infof("[GoScanAndSchedule] scan and run start, scan interval[%v], instant scan interval[%v]",
-		s.config.ScanInterval, s.config.InstantScanInterval)
+	logger := s.logger()
+	logger.Infof("[GoScanAndSchedule] scan and run start, scan interval[%v], instant scan interval[%v]", s.scanInterval, s.instantScanInterval)
 	go func() {
 		defer panicHandler()
 		for {
 			select {
-			case <-s.config.done():
+			case <-s.done():
 				return
 			default:
 				s.scanAndSchedule()
-				time.Sleep(s.scanInterval())
+				time.Sleep(s.randomScanInterval())
 			}
 		}
 	}()
 }
 
 func (s *taskScannerImp) scanAndSchedule() {
-	logger := s.config.logger()
+	logger := s.logger()
 
 	if !s.scheduler.CanSchedule() {
 		// the schedule has reached its capacity limit
-		s.switchOffInstantScan()
+		s.swishOffInstantScan()
 		return
 	}
 
@@ -50,20 +49,20 @@ func (s *taskScannerImp) scanAndSchedule() {
 		if err != ErrTaskNotFound {
 			logger.Errorf("[scanAndSchedule] claim task err, err[%v]", err)
 		}
-		s.switchOffInstantScan()
+		s.swishOffInstantScan()
 		return
 	} else if task != nil {
 		s.scheduler.GoScheduleTask(task)
 	}
 
-	s.switchOnInstantScan()
+	s.swishOnInstantScan()
 }
 
-func (s *taskScannerImp) scanInterval() time.Duration {
+func (s *taskScannerImp) randomScanInterval() time.Duration {
 	if s.needInstantScan() {
-		return randomInterval(s.config.InstantScanInterval)
+		return randomInterval(s.instantScanInterval)
 	}
-	return randomInterval(s.config.ScanInterval)
+	return randomInterval(s.scanInterval)
 }
 
 func (s *taskScannerImp) needInstantScan() bool {
@@ -74,19 +73,17 @@ func (s *taskScannerImp) needInstantScan() bool {
 	return iv.(bool)
 }
 
-func (s *taskScannerImp) switchOffInstantScan() {
+func (s *taskScannerImp) swishOffInstantScan() {
 	s.instantScan.Store(false)
 }
 
-func (s *taskScannerImp) switchOnInstantScan() {
+func (s *taskScannerImp) swishOnInstantScan() {
 	s.instantScan.Store(true)
 }
 
 func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
-	tc := s.config
-
 	sensitiveKeys, insensitiveKeys := s.register.GroupKeysByInitTimeoutSensitivity()
-	task, err := s.dal.GetInitialized(tc.db(), sensitiveKeys, tc.InitializedTimeout, insensitiveKeys)
+	task, err := s.dal.GetInitialized(s.getDB(), sensitiveKeys, s.initializedTimeout, insensitiveKeys)
 	if err != nil {
 		return nil, err
 	} else if task == nil {
@@ -95,11 +92,11 @@ func (s *taskScannerImp) claimInitializedTask() (*Task, error) {
 	}
 
 	select {
-	case <-tc.done():
+	case <-s.done():
 		// abort claim when cancel signal received
 		return nil, nil
 	default:
-		if rowsAffected, err := s.dal.UpdateStatusByIDs(tc.db(), []uint64{task.ID}, task.TaskStatus, TaskStatusRunning); err != nil {
+		if rowsAffected, err := s.dal.UpdateStatusByIDs(s.getDB(), []uint64{task.ID}, task.TaskStatus, TaskStatusRunning); err != nil {
 			return nil, err
 		} else if rowsAffected == 0 {
 			// task is claimed by others, ignore error

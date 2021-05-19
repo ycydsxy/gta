@@ -20,7 +20,7 @@ func (e *testErrCtxMarshaler) UnmarshalCtx(bytes []byte) (context.Context, error
 
 func Test_taskAssemblerImp_AssembleTask(t *testing.T) {
 	convey.Convey("Test_taskAssemblerImp_AssembleTask", t, func() {
-		tass := taskAssemblerImp{config: &TaskConfig{CtxMarshaler: &defaultCtxMarshaler{}}}
+		tass := taskAssemblerImp{options: &options{ctxMarshaler: &defaultCtxMarshaler{}}}
 		convey.Convey("normal", func() {
 			convey.Convey("nil arg type", func() {
 				task, err := tass.AssembleTask(context.TODO(), &TaskDefinition{}, nil)
@@ -59,7 +59,7 @@ func Test_taskAssemblerImp_AssembleTask(t *testing.T) {
 
 func Test_taskAssemblerImp_DisassembleTask(t *testing.T) {
 	convey.Convey("Test_taskAssemblerImp_DisassembleTask", t, func() {
-		tass := taskAssemblerImp{config: &TaskConfig{CtxMarshaler: &defaultCtxMarshaler{}}}
+		tass := taskAssemblerImp{options: &options{ctxMarshaler: &defaultCtxMarshaler{}}}
 		convey.Convey("normal", func() {
 			convey.Convey("nil arg type", func() {
 				taskDef := &TaskDefinition{}

@@ -16,23 +16,21 @@ type cleanUpReq struct {
 }
 
 func registerCleanUpTask(tm *TaskManager) {
-	tc := tm.tc
 	tm.Register(taskCleanUp, TaskDefinition{
 		Handler:      cleanUpHandler(tm),
 		ArgType:      reflect.TypeOf(cleanUpReq{}),
 		builtin:      true,
 		taskID:       taskCleanUpID,
-		argument:     cleanUpReq{StorageTimeout: tc.StorageTimeout},
-		loopInterval: tc.StorageTimeout / 2,
+		argument:     cleanUpReq{StorageTimeout: tm.storageTimeout},
+		loopInterval: tm.storageTimeout / 2,
 	})
 }
 
 func cleanUpHandler(tm *TaskManager) TaskHandler {
-	tc := tm.tc
 	return func(ctx context.Context, arg interface{}) (err error) {
-		logger := tc.logger()
+		logger := tm.logger()
 		storageTimeout := arg.(cleanUpReq).StorageTimeout
-		rowsAffected, err := tm.tdal.DeleteSucceededByOffset(tc.db(), storageTimeout, tm.tr.GetBuiltInKeys())
+		rowsAffected, err := tm.tdal.DeleteSucceededByOffset(tm.getDB(), storageTimeout, tm.tr.GetBuiltInKeys())
 		if err != nil {
 			return err
 		} else if rowsAffected > 0 {

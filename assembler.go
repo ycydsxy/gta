@@ -13,7 +13,7 @@ type taskAssembler interface {
 }
 
 type taskAssemblerImp struct {
-	config *TaskConfig
+	*options
 }
 
 func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefinition, arg interface{}) (*Task, error) {
@@ -39,7 +39,7 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 		task.Argument = argBytes
 	}
 	if ctxIn != nil {
-		ctxBytes, err := taskDef.ctxMarshaler(s.config).MarshalCtx(ctxIn)
+		ctxBytes, err := taskDef.ctxMarshaler(s.ctxMarshaler).MarshalCtx(ctxIn)
 		if err != nil {
 			return nil, fmt.Errorf("get ctxBytes failed, err: %w", err)
 		}
@@ -50,7 +50,7 @@ func (s *taskAssemblerImp) AssembleTask(ctxIn context.Context, taskDef *TaskDefi
 }
 
 func (s *taskAssemblerImp) DisassembleTask(taskDef *TaskDefinition, task *Task) (context.Context, interface{}, error) {
-	ctxIn, err := taskDef.ctxMarshaler(s.config).UnmarshalCtx(task.Context)
+	ctxIn, err := taskDef.ctxMarshaler(s.ctxMarshaler).UnmarshalCtx(task.Context)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unmarshal task context error: %w", err)
 	}

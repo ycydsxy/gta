@@ -24,11 +24,11 @@ type taskDAL interface {
 }
 
 type taskDALImp struct {
-	config *TaskConfig
+	*options
 }
 
 func (s *taskDALImp) tabledDB(tx *gorm.DB) *gorm.DB {
-	return tx.Table(s.config.Table)
+	return tx.Table(s.table)
 }
 
 func (s *taskDALImp) Create(tx *gorm.DB, task *Task) error {

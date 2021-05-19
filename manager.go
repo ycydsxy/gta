@@ -11,7 +11,7 @@ import (
 
 // TaskManager is the overall processor of task, which includes scheduler, scanner and other components
 type TaskManager struct {
-	tc   *TaskConfig
+	*options
 	tr   taskRegister
 	tass taskAssembler
 	tsch taskScheduler
@@ -26,7 +26,7 @@ type TaskManager struct {
 // Start starts the TaskManager. This function should be called before any other functions in a TaskManager is called.
 func (s *TaskManager) Start() {
 	s.startOnce.Do(func() {
-		if s.tc.DryRun {
+		if s.dryRun {
 			// don't start scan and monitor process in dry run mode
 			return
 		}
@@ -58,7 +58,7 @@ func (s *TaskManager) Register(key TaskKey, definition TaskDefinition) {
 // If the retry times exceeds the maximum config value, the task is marked 'failed' in the database with error logs
 // recorded. In these cases, maybe a manual operation is essential.
 //
-// The context passed in should be consistent with the 'CtxMarshaler' value defined in the overall configuration or the
+// The context passed in should be consistent with the 'ctxMarshaler' value defined in the overall configuration or the
 // task definition.
 func (s *TaskManager) Run(ctx context.Context, key TaskKey, arg interface{}) error {
 	return s.Transaction(func(tx *gorm.DB) error { return s.RunWithTx(tx, ctx, key, arg) })
@@ -106,9 +106,9 @@ func (s *TaskManager) Transaction(fc func(tx *gorm.DB) error) (err error) {
 // The wait parameter determines whether to wait for all running tasks to complete.
 func (s *TaskManager) Stop(wait bool) {
 	s.stopOnce.Do(func() {
-		if !s.tc.DryRun {
+		if !s.dryRun {
 			// send global cancel signal
-			s.tc.cancel()
+			s.cancel()
 		}
 		s.tsch.Stop(wait)
 	})
@@ -128,12 +128,12 @@ func (s *TaskManager) Stop(wait bool) {
 
 // ForceRerunTasks changes specific tasks to 'initialized'.
 func (s *TaskManager) ForceRerunTasks(taskIDs []uint64, status TaskStatus) (int64, error) {
-	return s.tdal.UpdateStatusByIDs(s.tc.db(), taskIDs, status, TaskStatusInitialized)
+	return s.tdal.UpdateStatusByIDs(s.getDB(), taskIDs, status, TaskStatusInitialized)
 }
 
 // QueryUnsuccessfulTasks checks initialized, running or failed tasks.
 func (s *TaskManager) QueryUnsuccessfulTasks(limit, offset int) ([]Task, error) {
-	return s.tdal.GetSliceExcludeSucceeded(s.tc.db(), s.tr.GetBuiltInKeys(), limit, offset)
+	return s.tdal.GetSliceExcludeSucceeded(s.getDB(), s.tr.GetBuiltInKeys(), limit, offset)
 }
 
 func (s *TaskManager) registerBuiltinTasks() {
@@ -146,19 +146,19 @@ func (s *TaskManager) registerBuiltinTasks() {
 // The database and task table must be provided because this tool relies heavily on the database. For more information
 // about the table schema, please refer to 'model.sql'.
 func NewTaskManager(db *gorm.DB, table string, options ...Option) *TaskManager {
-	tc, err := newConfig(db, table, options...)
+	opts, err := newOptions(db, table, options...)
 	if err != nil {
 		panic(err)
 	}
-	tr := tc.taskRegister
-	tdal := &taskDALImp{config: tc}
-	tass := &taskAssemblerImp{config: tc}
-	pool, err := ants.NewPool(tc.PoolSize, ants.WithLogger(tc.logger()), ants.WithNonblocking(true))
+	tr := opts.taskRegister
+	tdal := &taskDALImp{options: opts}
+	tass := &taskAssemblerImp{options: opts}
+	pool, err := ants.NewPool(opts.poolSize, ants.WithLogger(opts.logger()), ants.WithNonblocking(true))
 	if err != nil {
 		panic(err)
 	}
-	tsch := &taskSchedulerImp{config: tc, register: tr, dal: tdal, assembler: tass, pool: pool}
-	tmon := &taskMonitorImp{config: tc, register: tr, dal: tdal, assembler: tass}
-	tscn := &taskScannerImp{config: tc, register: tr, dal: tdal, scheduler: tsch}
-	return &TaskManager{tc: tc, tr: tr, tass: tass, tsch: tsch, tdal: tdal, tmon: tmon, tscn: tscn}
+	tsch := &taskSchedulerImp{options: opts, register: tr, dal: tdal, assembler: tass, pool: pool}
+	tmon := &taskMonitorImp{options: opts, register: tr, dal: tdal, assembler: tass}
+	tscn := &taskScannerImp{options: opts, register: tr, dal: tdal, scheduler: tsch}
+	return &TaskManager{options: opts, tr: tr, tass: tass, tsch: tsch, tdal: tdal, tmon: tmon, tscn: tscn}
 }

@@ -47,13 +47,13 @@ func TestTaskDefinition_ctxMarshaler(t *testing.T) {
 	convey.Convey("TestTaskDefinition_ctxMarshaler", t, func() {
 		convey.Convey("empty ctxMarshal in taskDef", func() {
 			taskDef := &TaskDefinition{}
-			cm := taskDef.ctxMarshaler(&TaskConfig{CtxMarshaler: &defaultCtxMarshaler{}})
+			cm := taskDef.ctxMarshaler(&defaultCtxMarshaler{})
 			convey.So(cm, convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("specify ctxMarshal in taskDef", func() {
 			taskDef := &TaskDefinition{CtxMarshaler: &defaultCtxMarshaler{}}
-			cm := taskDef.ctxMarshaler(&TaskConfig{})
+			cm := taskDef.ctxMarshaler(nil)
 			convey.So(cm, convey.ShouldNotBeNil)
 		})
 	})
